@@ -10,6 +10,10 @@
 
 @interface Document : NSDocument
 
+@property (assign, nonatomic) NSUInteger sectorSize;
+@property (assign, nonatomic) NSData *bootSectorData;
+@property (assign, nonatomic) NSData *mainSectorData;
+
 
 @end
 

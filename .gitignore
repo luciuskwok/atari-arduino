@@ -1,0 +1,29 @@
+# Mac OS X files
+.DS_Store
+*.swp
+
+# Xcode build files
+build/
+
+# Xcode project files
+*.mode1 
+*.mode2
+*.mode1v3
+*.perspective
+*.perspectivev3
+*.pbxuser
+xcuserdata/
+
+# Interface Builder backups
+*~.nib
+
+# hg (Mercurial) files
+.hg/
+.hg-old/
+.hgignore
+*.orig
+*.rej
+
+# File or folder that begins with double underscore. -Lucius Kwok
+__*
+
