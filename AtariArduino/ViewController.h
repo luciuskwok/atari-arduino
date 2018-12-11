@@ -12,6 +12,7 @@
 <NSTableViewDelegate, NSTableViewDataSource>
 
 @property (weak, nonatomic) IBOutlet NSTableView *directoryTableView;
+@property (weak, nonatomic) IBOutlet NSTextField *statusLabel;
 
 @property (strong, nonatomic) NSArray<NSDictionary *> *directory;
 
