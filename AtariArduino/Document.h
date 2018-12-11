@@ -16,7 +16,7 @@
 
 
 - (NSArray<NSDictionary*>*) directory;
-- (NSUInteger) usableSectorCount;
+- (NSUInteger) diskImageSize;
 - (NSUInteger) freeSectorCount;
 
 - (NSData *) dataInSector:(NSUInteger)sectorNumber;

@@ -159,12 +159,10 @@
 	return result;
 }
 
-- (NSUInteger) usableSectorCount {
+- (NSUInteger) diskImageSize {
 	NSUInteger result = 0;
-	NSData *vtoc = [self dataInSector:360];
-	if (vtoc) {
-		const UInt8 *vtocPtr = vtoc.bytes;
-		result = vtocPtr[1] + vtocPtr[2] * 256;
+	for (NSData *sectorData in self.sectors) {
+		result += sectorData.length;
 	}
 	return result;
 }

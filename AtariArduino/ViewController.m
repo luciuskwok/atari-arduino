@@ -28,12 +28,12 @@
 		[self.directoryTableView reloadData];
 		//self.preferredContentSize = NSMakeSize(292, (3 + self.directory.count) * 17);
 		
-		NSUInteger totalSectors = [self.document usableSectorCount];
+		NSUInteger diskSize = [self.document diskImageSize];
 		NSUInteger freeSectors = [self.document freeSectorCount];
-		if (totalSectors == 0 && freeSectors == 0) {
-			self.statusLabel.stringValue = @"Unformatted disk";
+		if (freeSectors == 0) {
+			self.statusLabel.stringValue = [NSString stringWithFormat:@"Unformatted %u KB disk", (unsigned int)diskSize];
 		} else {
-			self.statusLabel.stringValue = [NSString stringWithFormat:@"%u of %u sectors free", (unsigned int)freeSectors, (unsigned int)totalSectors];
+			self.statusLabel.stringValue = [NSString stringWithFormat:@"%u sectors free, %u KB disk", (unsigned int)freeSectors, (unsigned int)diskSize];
 		}
 	}
 }
