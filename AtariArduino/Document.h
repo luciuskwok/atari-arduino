@@ -11,9 +11,10 @@
 @interface Document : NSDocument
 
 @property (assign, nonatomic) NSUInteger sectorSize;
-@property (assign, nonatomic) NSData *bootSectorData;
-@property (assign, nonatomic) NSData *mainSectorData;
+@property (strong, nonatomic) NSData *bootSectorData;
+@property (strong, nonatomic) NSData *mainSectorData;
 
+- (NSArray<NSDictionary*>*)directory;
 
 @end
 

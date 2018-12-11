@@ -9,7 +9,11 @@
 #import <Cocoa/Cocoa.h>
 
 @interface ViewController : NSViewController
+<NSTableViewDelegate, NSTableViewDataSource>
 
+@property (weak, nonatomic) IBOutlet NSTableView *directoryTableView;
+
+@property (strong, nonatomic) NSArray<NSDictionary *> *directory;
 
 @end
 
