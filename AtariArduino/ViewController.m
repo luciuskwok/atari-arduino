@@ -27,6 +27,14 @@
 		self.directory = self.document.directory;
 		[self.directoryTableView reloadData];
 		//self.preferredContentSize = NSMakeSize(292, (3 + self.directory.count) * 17);
+		
+		NSUInteger totalSectors = [self.document usableSectorCount];
+		NSUInteger freeSectors = [self.document freeSectorCount];
+		if (totalSectors == 0 && freeSectors == 0) {
+			self.statusLabel.stringValue = @"Unformatted disk";
+		} else {
+			self.statusLabel.stringValue = [NSString stringWithFormat:@"%u of %u sectors free", (unsigned int)freeSectors, (unsigned int)totalSectors];
+		}
 	}
 }
 
@@ -65,7 +73,13 @@
 			text = @" ";
 		}
 	} else if ([tableColumn.identifier isEqualToString:@"filename"]) {
-		text = [NSString stringWithFormat:@"%@.%@", entry[@"filename"], entry[@"ext"]];
+		NSString *filename = entry[@"filename"];
+		NSString *ext = entry[@"ext"];
+		if (ext.length > 0) {
+			text = [NSString stringWithFormat:@"%@.%@", entry[@"filename"], entry[@"ext"]];
+		} else {
+			text = filename;
+		}
 	} else if ([tableColumn.identifier isEqualToString:@"size"]) {
 		short length = [entry[@"length"] unsignedShortValue];
 		text = [NSString stringWithFormat:@"%d", length];

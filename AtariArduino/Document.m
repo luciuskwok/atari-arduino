@@ -17,7 +17,15 @@
 - (instancetype)init {
 	self = [super init];
 	if (self) {
-		// Add your subclass-specific initialization here.
+		// By default, make a blank single density disk, with a total of 720 sectors.
+		_bootSectorSize = 128;
+		_mainSectorSize = 128;
+		NSMutableArray<NSData *> *newSectors = [NSMutableArray arrayWithCapacity:1024];
+		for (NSInteger index=0; index<720; ++index) {
+			NSMutableData *sector = [NSMutableData dataWithLength:128];
+			[newSectors addObject:sector];
+		}
+		self.sectors = newSectors;
 	}
 	return self;
 }
@@ -53,10 +61,10 @@
 	}
 
 	// Parse 16-byte header
-	UInt16 magic, diskSizeParagraphs, aSectorSize;
+	UInt16 magic, diskSizeParagraphs, sectorSize;
 	[data getBytes:&magic range:NSMakeRange(0, 2)];
 	[data getBytes:&diskSizeParagraphs range:NSMakeRange(2, 2)];
-	[data getBytes:&aSectorSize range:NSMakeRange(4, 2)];
+	[data getBytes:&sectorSize range:NSMakeRange(4, 2)];
 	
 	// Magic word in file header
 	if (magic != 0x0296) {
@@ -72,13 +80,21 @@
 	}
 	
 	// Sector size
-	_sectorSize = aSectorSize;
+	_mainSectorSize = sectorSize;
 	
-	// Boot sectors
-	self.bootSectorData = [data subdataWithRange:NSMakeRange(16, 384)];
-	
-	// Main sectors
-	self.mainSectorData = [data subdataWithRange:NSMakeRange(16+384, diskSize-384)];
+	// Divide the disk image data up into sectors
+	NSMutableArray<NSData *> *sectorArray = [NSMutableArray arrayWithCapacity:1024];
+	for (NSInteger index=0; index<3; ++index) {
+		NSData *bootSectorData = [data subdataWithRange:NSMakeRange(16 + index * _bootSectorSize, _bootSectorSize)];
+		[sectorArray addObject:bootSectorData];
+	}
+	NSUInteger offset = 16 + 384;
+	while (offset < data.length) {
+		NSData *sectorData = [data subdataWithRange:NSMakeRange(offset, _mainSectorSize)];
+		[sectorArray addObject:sectorData];
+		offset += _mainSectorSize;
+	}
+	self.sectors = sectorArray;
 	
 	return YES;
 }
@@ -91,41 +107,40 @@
 
 - (NSArray<NSDictionary*>*)directory {
 	// Make sure the main sectors are large enough for Atari DOS directory structure.
-	const NSUInteger firstMainSector = 4;
-	const NSUInteger dirSectorIndex = 361;
-	const NSUInteger dirSectorCount = 8;
-	const NSUInteger directoryLimit = (dirSectorIndex + dirSectorCount + firstMainSector) * _sectorSize;
-	if (_sectorSize == 0 || self.mainSectorData.length < directoryLimit) {
+	if (_mainSectorSize == 0 || self.sectors.count < 720) {
+		NSLog(@"[LK] Invalid disk image!");
 		return nil;
 	}
 	
-	// Set dirEntry to point to first byte of directory structure
+	const NSUInteger dirSectorNumber = 361;
 	NSMutableArray *results = [NSMutableArray arrayWithCapacity:64];
-	UInt8 const *dirEntry = self.mainSectorData.bytes + (dirSectorIndex - firstMainSector) * _sectorSize;
-	for (NSUInteger index=0; index<64; ++index) {
-		UInt8 flags = dirEntry[0];
-		
-		// Skip directory entries that are unused or deleted
-		if ( !(flags & 0x80) && (flags & 0x40) ) {
-			NSMutableDictionary *entry = [NSMutableDictionary dictionaryWithCapacity:5];
-			entry[@"flags"] = @(flags);
-			
-			UInt16 length = dirEntry[1] + dirEntry[2] * 256;
-			entry[@"length"] = @(length);
-
-			UInt16 start = dirEntry[3] + dirEntry[4] * 256;
-			entry[@"start"] = @(start);
-			
-			entry[@"filename"] = [self stringWithChars:dirEntry+5 maxLength:8];
-			entry[@"ext"] = [self stringWithChars:dirEntry+13 maxLength:3];
-		
-			NSLog(@"%02x %@.%@ %d %d", flags, entry[@"filename"], entry[@"ext"], length, start);
-			[results addObject:entry];
-		}
-		
-		dirEntry += 16;
-	}
-	
+	for (NSUInteger sectorOffset = 0; sectorOffset < 8; ++sectorOffset) {
+		NSData *sectorData = [self dataInSector:dirSectorNumber + sectorOffset];
+		if (sectorData) {
+			for (NSUInteger entryIndex = 0; entryIndex < 8; ++entryIndex) {
+				UInt8 const *dirEntry = sectorData.bytes + entryIndex * 16;
+				UInt8 flags = dirEntry[0];
+				
+				// Skip directory entries that are unused or deleted
+				if ( !(flags & 0x80) && (flags & 0x40) ) {
+					NSMutableDictionary *entry = [NSMutableDictionary dictionaryWithCapacity:5];
+					entry[@"flags"] = @(flags);
+					
+					UInt16 length = dirEntry[1] + dirEntry[2] * 256;
+					entry[@"length"] = @(length);
+					
+					UInt16 start = dirEntry[3] + dirEntry[4] * 256;
+					entry[@"start"] = @(start);
+					
+					entry[@"filename"] = [self stringWithChars:dirEntry+5 maxLength:8];
+					entry[@"ext"] = [self stringWithChars:dirEntry+13 maxLength:3];
+					
+					NSLog(@"%02x %@.%@ %d %d", flags, entry[@"filename"], entry[@"ext"], length, start);
+					[results addObject:entry];
+				} // end if (flags)
+			} // end for (entryIndex)
+		} // end if (sectorData)
+	} // end for (sectorOffset)
 	return results;
 }
 
@@ -144,5 +159,42 @@
 	return result;
 }
 
+- (NSUInteger) usableSectorCount {
+	NSUInteger result = 0;
+	NSData *vtoc = [self dataInSector:360];
+	if (vtoc) {
+		const UInt8 *vtocPtr = vtoc.bytes;
+		result = vtocPtr[1] + vtocPtr[2] * 256;
+	}
+	return result;
+}
+
+- (NSUInteger) freeSectorCount {
+	NSUInteger result = 0;
+	NSData *vtoc = [self dataInSector:360];
+	if (vtoc) {
+		const UInt8 *vtocPtr = vtoc.bytes;
+		result = vtocPtr[3] + vtocPtr[4] * 256;
+	}
+	return result;
+}
+
+- (NSData *) dataInSector:(NSUInteger)sectorNumber {
+	if (sectorNumber == 0 || _mainSectorSize == 0 || sectorNumber > self.sectors.count) {
+		NSLog(@"[LK] Invalid disk image!");
+		return nil;
+	}
+	return [self.sectors objectAtIndex:sectorNumber - 1];
+}
+
+- (BOOL) writeData:(NSData *)data inSector:(NSUInteger)sectorNumber {
+	if (sectorNumber == 0 || _mainSectorSize == 0 || sectorNumber > self.sectors.count) {
+		NSLog(@"[LK] Invalid disk image!");
+		return NO;
+	}
+	
+	[self.sectors replaceObjectAtIndex:sectorNumber - 1 withObject:data];
+	return YES;
+}
 
 @end

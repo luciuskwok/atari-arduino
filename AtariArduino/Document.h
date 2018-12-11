@@ -10,11 +10,18 @@
 
 @interface Document : NSDocument
 
-@property (assign, nonatomic) NSUInteger sectorSize;
-@property (strong, nonatomic) NSData *bootSectorData;
-@property (strong, nonatomic) NSData *mainSectorData;
+@property (assign, nonatomic) NSUInteger bootSectorSize;
+@property (assign, nonatomic) NSUInteger mainSectorSize;
+@property (strong, nonatomic) NSMutableArray<NSData *> *sectors;
 
-- (NSArray<NSDictionary*>*)directory;
+
+- (NSArray<NSDictionary*>*) directory;
+- (NSUInteger) usableSectorCount;
+- (NSUInteger) freeSectorCount;
+
+- (NSData *) dataInSector:(NSUInteger)sectorNumber;
+- (BOOL) writeData:(NSData *)data inSector:(NSUInteger)sectorNumber;
+
 
 @end
 
