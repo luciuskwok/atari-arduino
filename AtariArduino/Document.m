@@ -105,6 +105,8 @@
 	}
 }
 
+#pragma mark -
+
 - (NSArray<NSDictionary*>*)directory {
 	// Make sure the main sectors are large enough for Atari DOS directory structure.
 	if (_mainSectorSize == 0 || self.sectors.count < 368) {
@@ -137,7 +139,7 @@
 					
 					entry[@"index"] = @(entryIndex + 8 * sectorOffset);
 					
-					NSLog(@"%02x %@.%@ %d %d", flags, entry[@"filename"], entry[@"ext"], length, start);
+					//NSLog(@"%02x %@.%@ %d %d", flags, entry[@"filename"], entry[@"ext"], length, start);
 					[results addObject:entry];
 				} // end if (flags)
 			} // end for (entryIndex)
@@ -162,7 +164,68 @@
 }
 
 - (BOOL) setFilename:(NSString *)filename atIndex:(NSUInteger)index {
-	return NO;
+	// Takes a filename in the format "FILENAME.EXE", using the first 8 chars for the filename and first 3 chars for the extension. Any extra chars are ignored. All chars are converted to uppercase.
+	if (filename.length == 0) {
+		NSLog(@"[LK] Invalid filename.");
+		return NO;
+	}
+	NSArray<NSString *> *nameComponents = [filename componentsSeparatedByString:@"."];
+	NSString *filenameOnly;
+	NSString *extension;
+	if (nameComponents.count == 1) {
+		// Filename without extension
+		filenameOnly = nameComponents[0].uppercaseString;
+		extension = @"";
+	} else {
+		filenameOnly = nameComponents[0].uppercaseString;
+		extension = nameComponents.lastObject.uppercaseString;
+	}
+	if (filenameOnly.length == 0) {
+		NSLog(@"[LK] Invalid filename.");
+		return NO;
+	}
+	
+	// Convert to ASCII
+	const char *filenameOnlyAscii = [filenameOnly cStringUsingEncoding:NSASCIIStringEncoding];
+	const char *extensionAscii = [extension cStringUsingEncoding:NSASCIIStringEncoding];
+	if (filenameOnlyAscii == nil || extensionAscii == nil) {
+		NSLog(@"[LK] Invalid filename.");
+		return NO;
+	}
+
+	NSData *oldData = [self rawDirectoryEntryAtIndex:index];
+	if (oldData == nil) {
+		return NO;
+	}
+	NSMutableData *modifiedData = [NSMutableData dataWithData:oldData];
+	UInt8 *rawPtr = modifiedData.mutableBytes;
+	
+	// Clear filename area with spaces.
+	for (NSUInteger index = 5; index <= 15; ++index) {
+		rawPtr[index] = 0x20;
+	}
+	
+	// Insert the filename
+	for (NSUInteger index = 0; index < 8; ++index) {
+		char c = filenameOnlyAscii[index];
+		if (c == 0) {
+			break;
+		} else {
+			rawPtr[index + 5] = c;
+		}
+	}
+
+	// Insert the extension
+	for (NSUInteger index = 0; index < 3; ++index) {
+		char c = extensionAscii[index];
+		if (c == 0) {
+			break;
+		} else {
+			rawPtr[index + 13] = c;
+		}
+	}
+
+	return [self setRawDirectoryEntry:modifiedData atIndex:index];
 }
 
 - (BOOL) setLocked:(BOOL)locked atIndex:(NSUInteger)index {

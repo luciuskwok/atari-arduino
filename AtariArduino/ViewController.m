@@ -28,6 +28,8 @@
 	}
 }
 
+#pragma mark - Document
+
 - (void)setRepresentedObject:(id)representedObject {
     [super setRepresentedObject:representedObject];
 
@@ -58,14 +60,23 @@
 	}
 }
 
-#pragma mark -
+- (BOOL)isFirstSelectedItemLocked {
+	NSIndexSet *selection = [self.directoryTableView selectedRowIndexes];
+	if (selection.count > 0) {
+		NSUInteger firstSelectedRow = selection.firstIndex;
+		NSDictionary *entry = self.directory[firstSelectedRow];
+		return (([entry[@"flags"] unsignedCharValue] & 0x20) != 0);
+	}
+	return NO;
+}
+
+#pragma mark - Table
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
 	return self.directory.count;
 }
 
 - (NSView *) tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
-
 	NSDictionary *entry = self.directory[row];
 	NSString *text;
 
@@ -94,15 +105,24 @@
 	return cellView;
 }
 
-- (BOOL)isFirstSelectedItemLocked {
-	NSIndexSet *selection = [self.directoryTableView selectedRowIndexes];
-	if (selection.count > 0) {
-		NSUInteger firstSelectedRow = selection.firstIndex;
-		NSDictionary *entry = self.directory[firstSelectedRow];
-		return (([entry[@"flags"] unsignedCharValue] & 0x20) != 0);
+- (IBAction)didRenameItem:(id)sender {
+	NSTextField *field = (NSTextField *)sender;
+	if ([field isKindOfClass:[NSTextField class]] == NO) {
+		NSLog(@"[LK] didRenameItem: sender is not NSTextField.");
+		return;
 	}
-	return NO;
+	NSString *newText = field.stringValue;
+
+	NSInteger selectedRow = [self.directoryTableView selectedRow];
+	if (selectedRow != NSNotFound) {
+		NSDictionary *entry = self.directory[selectedRow];
+		NSUInteger onDiskIndex = [entry[@"index"] unsignedIntegerValue];
+		[self.document setFilename:newText atIndex:onDiskIndex];
+	}
+	[self reloadDirectory];
 }
+
+#pragma mark - Menu
 
 - (IBAction)toggleItemLock:(id)sender {
 	// If first selected item is locked, then unlock all selected items.
@@ -123,8 +143,10 @@
 }
 
 - (IBAction)renameItem:(id)sender {
-	NSLog(@"[LK] Rename item.");
-	[self reloadDirectory];
+	NSInteger selectedRow = [self.directoryTableView selectedRow];
+	if (selectedRow != NSNotFound) {
+		[self.directoryTableView editColumn:1 row:selectedRow withEvent:nil select:YES];
+	}
 }
 
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem {

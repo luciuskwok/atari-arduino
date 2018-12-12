@@ -18,6 +18,7 @@
 
 - (IBAction)toggleItemLock:(id)sender;
 - (IBAction)renameItem:(id)sender;
+- (IBAction)didRenameItem:(id)sender;
 
 
 @end
