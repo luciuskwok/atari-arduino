@@ -7,18 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		E02309A621BE3EA20021933D /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = E02309A521BE3EA20021933D /* AppDelegate.m */; };
 		E02309A921BE3EA20021933D /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = E02309A821BE3EA20021933D /* ViewController.m */; };
 		E02309AC21BE3EA20021933D /* Document.m in Sources */ = {isa = PBXBuildFile; fileRef = E02309AB21BE3EA20021933D /* Document.m */; };
 		E02309AE21BE3EA30021933D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E02309AD21BE3EA30021933D /* Assets.xcassets */; };
 		E02309B121BE3EA30021933D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = E02309AF21BE3EA30021933D /* Main.storyboard */; };
 		E02309B421BE3EA30021933D /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = E02309B321BE3EA30021933D /* main.m */; };
+		E0C9A74221C16E45008D9E77 /* DiskViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C9A74021C16E45008D9E77 /* DiskViewController.swift */; };
+		E0C9A74321C16E45008D9E77 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C9A74121C16E45008D9E77 /* AppDelegate.swift */; };
+		E0C9A74521C17036008D9E77 /* AtariDiskImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C9A74421C17036008D9E77 /* AtariDiskImage.swift */; };
+		E0C9A74721C17F3C008D9E77 /* DirectoryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C9A74621C17F3C008D9E77 /* DirectoryEntry.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		E02309A121BE3EA20021933D /* AtariArduino.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AtariArduino.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E02309A421BE3EA20021933D /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
-		E02309A521BE3EA20021933D /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		E02309A721BE3EA20021933D /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
 		E02309A821BE3EA20021933D /* ViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ViewController.m; sourceTree = "<group>"; };
 		E02309AA21BE3EA20021933D /* Document.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Document.h; sourceTree = "<group>"; };
@@ -28,6 +29,11 @@
 		E02309B221BE3EA30021933D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E02309B321BE3EA30021933D /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		E02309B521BE3EA30021933D /* AtariArduino.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AtariArduino.entitlements; sourceTree = "<group>"; };
+		E0C9A73F21C16E45008D9E77 /* AtariArduino-Bridging-Header.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "AtariArduino-Bridging-Header.h"; sourceTree = "<group>"; };
+		E0C9A74021C16E45008D9E77 /* DiskViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DiskViewController.swift; sourceTree = "<group>"; };
+		E0C9A74121C16E45008D9E77 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		E0C9A74421C17036008D9E77 /* AtariDiskImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtariDiskImage.swift; sourceTree = "<group>"; };
+		E0C9A74621C17F3C008D9E77 /* DirectoryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryEntry.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,8 +66,7 @@
 		E02309A321BE3EA20021933D /* AtariArduino */ = {
 			isa = PBXGroup;
 			children = (
-				E02309A421BE3EA20021933D /* AppDelegate.h */,
-				E02309A521BE3EA20021933D /* AppDelegate.m */,
+				E0C9A73E21C16E45008D9E77 /* Code */,
 				E02309A721BE3EA20021933D /* ViewController.h */,
 				E02309A821BE3EA20021933D /* ViewController.m */,
 				E02309AA21BE3EA20021933D /* Document.h */,
@@ -73,6 +78,18 @@
 				E02309B521BE3EA30021933D /* AtariArduino.entitlements */,
 			);
 			path = AtariArduino;
+			sourceTree = "<group>";
+		};
+		E0C9A73E21C16E45008D9E77 /* Code */ = {
+			isa = PBXGroup;
+			children = (
+				E0C9A73F21C16E45008D9E77 /* AtariArduino-Bridging-Header.h */,
+				E0C9A74121C16E45008D9E77 /* AppDelegate.swift */,
+				E0C9A74021C16E45008D9E77 /* DiskViewController.swift */,
+				E0C9A74421C17036008D9E77 /* AtariDiskImage.swift */,
+				E0C9A74621C17F3C008D9E77 /* DirectoryEntry.swift */,
+			);
+			path = Code;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -106,6 +123,7 @@
 				TargetAttributes = {
 					E02309A021BE3EA20021933D = {
 						CreatedOnToolsVersion = 10.1;
+						LastSwiftMigration = 1010;
 					};
 				};
 			};
@@ -144,10 +162,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E0C9A74521C17036008D9E77 /* AtariDiskImage.swift in Sources */,
 				E02309AC21BE3EA20021933D /* Document.m in Sources */,
+				E0C9A74221C16E45008D9E77 /* DiskViewController.swift in Sources */,
 				E02309A921BE3EA20021933D /* ViewController.m in Sources */,
 				E02309B421BE3EA30021933D /* main.m in Sources */,
-				E02309A621BE3EA20021933D /* AppDelegate.m in Sources */,
+				E0C9A74321C16E45008D9E77 /* AppDelegate.swift in Sources */,
+				E0C9A74721C17F3C008D9E77 /* DirectoryEntry.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -280,6 +301,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = AtariArduino/AtariArduino.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -291,6 +313,9 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.felttip.AtariArduino;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "AtariArduino/Code/AtariArduino-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 4.2;
 			};
 			name = Debug;
 		};
@@ -298,6 +323,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = AtariArduino/AtariArduino.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -309,6 +335,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.felttip.AtariArduino;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "AtariArduino/Code/AtariArduino-Bridging-Header.h";
+				SWIFT_VERSION = 4.2;
 			};
 			name = Release;
 		};
