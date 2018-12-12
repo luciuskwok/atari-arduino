@@ -25,6 +25,28 @@ struct DirectoryEntry {
 		fileExtension = ""
 	}
 	
+	init(atariData:Data, index:Int) {
+		self.index = index
+		flags = atariData[0]
+		length = UInt16(atariData[1]) + 256 * UInt16(atariData[2])
+		start = UInt16(atariData[3]) + 256 * UInt16(atariData[4])
+		filename = DirectoryEntry.string(directoryData: atariData.subdata(in: 5..<13))
+		fileExtension = DirectoryEntry.string(directoryData: atariData.subdata(in: 13..<16))
+	}
+	
+	static func string(directoryData:Data) -> String {
+		var result = String()
+		for c in directoryData {
+			if c == 0 || c == 0x20 {
+				break;
+			}
+			result.append(String(format:"%c", c))
+		}
+		return result
+	}
+	
+	// MARK: -
+	
 	func isLocked() -> Bool {
 		return (flags & 0x20) != 0
 	}
@@ -45,24 +67,72 @@ struct DirectoryEntry {
 		}
 	}
 	
-	mutating func setFilenameAndExtension(data:Data) {
-		if data.count == 11 {
-			filename = string(directoryData: data.subdata(in: 0..<8))
-			fileExtension = string(directoryData: data.subdata(in: 8..<11))
+	mutating func setFilenameWithExtension(_ string:String) {
+		let components = string.components(separatedBy: ".")
+		if components.count < 2 {
+			filename = string
+			fileExtension = ""
 		} else {
-			NSLog("[LK] Invalid filename.ext length")
+			filename = components.first!
+			fileExtension = components.last!
 		}
+		
+		// Apply filename constraints
+		if filename.count > 8 {
+			filename = String(filename.prefix(8))
+		}
+		if fileExtension.count > 3 {
+			fileExtension = String(fileExtension.prefix(3))
+		}
+		filename = filename.uppercased()
+		fileExtension = fileExtension.uppercased()
+	}
+
+	func atariData() -> Data {
+		// Returns the directory entry as a 16-byte data block that can be written to an AtariDiskImage.
+		var data = Data(count: 16)
+		
+		data[0] = flags
+		data[1] = UInt8(length % 256)
+		data[2] = UInt8(length / 256)
+		data[3] = UInt8(start % 256)
+		data[4] = UInt8(start / 256)
+		
+		// Filename
+		let filenameAscii = asciiData(string:filename)
+		for index in 0..<8 {
+			var c = UInt8(0x20);
+			if index < filenameAscii.count {
+				c = filenameAscii[index]
+			}
+			data[5 + index] = c
+		}
+
+		// Extension
+		let extAscii = asciiData(string:fileExtension)
+		for index in 0..<3 {
+			var c = UInt8(0x20);
+			if index < extAscii.count {
+				c = extAscii[index]
+			}
+			data[13 + index] = c
+		}
+		
+		return data
 	}
 	
-	func string(directoryData:Data) -> String {
-		var result = String()
-		for c in directoryData {
-			if c == 0 || c == 0x20 {
-				break;
+	func asciiData(string:String) -> Data {
+		var data = Data()
+		string.forEach {
+			(c) in
+			if let uniChar = c.unicodeScalars.first {
+				if uniChar.isASCII {
+					let a = UInt8(uniChar.value)
+					data.append(a)
+				}
 			}
-			result.append(String(format:"%c", c))
 		}
-		return result
+		return data
 	}
 	
 }

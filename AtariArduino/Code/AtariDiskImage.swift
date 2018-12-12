@@ -12,6 +12,10 @@ class AtariDiskImage: NSDocument {
 	var bootSectorSize = 128
 	var mainSectorSize = 128
 	var sectors = [Data]()
+
+	let directoryStartSectorNumber = 361
+
+	// MARK: -
 	
 	override init() {
 		var newSectors = [Data]()
@@ -29,6 +33,8 @@ class AtariDiskImage: NSDocument {
 		let wc = NSStoryboard(name: "Main", bundle: nil).instantiateController(withIdentifier: "Document Window Controller")
 		addWindowController(wc as! NSWindowController)
 	}
+	
+	// MARK: - Mac I/O
 	
 	override func data(ofType typeName: String) throws -> Data {
 		// TODO
@@ -89,45 +95,40 @@ class AtariDiskImage: NSDocument {
 		return NSError(domain: NSCocoaErrorDomain, code: code, userInfo: nil)
 	}
 	
-	// MARK: - I/O
+	// MARK: - Atari I/O
 
 	func sector(number:Int) -> Data? {
-		if number == 0 || mainSectorSize == 0 || number > sectors.count {
+		if number == 0 || number > sectors.count {
+			NSLog("[LK] Invalid disk sector number")
 			return nil
 		}
 		return sectors[number - 1]
 	}
 	
-	func writeSector(number:Int, data:Data) -> Bool {
-		if number == 0 || mainSectorSize == 0 || number > sectors.count {
-			return false
+	func writeSector(number:Int, data:Data) {
+		if number == 0 || number > sectors.count {
+			NSLog("[LK] Invalid disk sector number")
+		} else {
+			sectors[number - 1] = data
 		}
-		sectors[number - 1] = data
-		return true
 	}
 
 	func directory() -> [DirectoryEntry] {
 		// Make sure the disk image is large enough for Atari DOS directory structure.
-		if mainSectorSize == 0 || sectors.count < 368 {
+		if isDos2FormatDisk() == false {
 			return []
 		}
 		
-		let dirSectorStart = 361
 		var dir = [DirectoryEntry]()
 		for dirSectorOffset in 0..<8 {
-			if let sectorData = sector(number: dirSectorStart + dirSectorOffset) {
+			if let sectorData = sector(number: directoryStartSectorNumber + dirSectorOffset) {
 				for entryIndex in 0..<8 {
 					// Add directory entries that are not unused or deleted
 					let offset = entryIndex * 16
 					let entryData = sectorData.subdata(in: offset..<offset+16)
 					let flags = entryData[0]
 					if (flags & 0x80) == 0 && (flags & 0x40) != 0 {
-						var entry = DirectoryEntry()
-						entry.index = entryIndex + 8 * dirSectorOffset
-						entry.flags = flags
-						entry.length = UInt16(entryData[1]) + 256 * UInt16(entryData[2])
-						entry.start = UInt16(entryData[3]) + 256 * UInt16(entryData[4])
-						entry.setFilenameAndExtension(data: entryData.subdata(in: 5..<16))
+						let entry = DirectoryEntry(atariData:entryData, index:entryIndex + 8 * dirSectorOffset)
 						dir.append(entry)
 					} // end if (flags)
 				} // end for (entryIndex)
@@ -136,5 +137,62 @@ class AtariDiskImage: NSDocument {
 		return dir
 	}
 	
+	func updateDirectory(entry:DirectoryEntry, at index:Int) {
+		// Make sure the disk image is large enough for Atari DOS directory structure.
+		if isDos2FormatDisk() == false {
+			return
+		}
+		
+		let sectorNumber = directoryStartSectorNumber + index / 8
+		let byteOffset = index % 8 * 16
+		if var sectorData = sector(number:sectorNumber) {
+			sectorData.replaceSubrange(byteOffset..<byteOffset+16, with: entry.atariData())
+			writeSector(number:sectorNumber, data:sectorData)
+		}
+	}
+
+	// MARK: - Stats
+	
+	func isDos2FormatDisk() -> Bool {
+		// Returns YES if the dosCode in the VTOC is 2, indicating a DOS 2.x-compatible disk.
+		if mainSectorSize == 0 || sectors.count < directoryStartSectorNumber + 8 {
+			return false
+		}
+		var dosCode:UInt8 = 0
+		if let vtoc = sector(number:360) {
+			dosCode = vtoc[0];
+		}
+		return dosCode == 2
+	}
+	
+	func size() -> Int {
+		var result = 0
+		for sector in sectors {
+			result += sector.count
+		}
+		return result
+	}
+	
+	func freeSectorCount() -> Int {
+		// This func only works with DOS 2.x format disks, and not with MyDos or other formats.
+		if isDos2FormatDisk() == false {
+			return 0
+		}
+		
+		var count = 0
+		// Get the free sector count from the VTOC at sector 360
+		if let vtoc = sector(number:360) {
+			count = Int(vtoc[3]) + 256 * Int(vtoc[4])
+			
+			// Special case for DOS 2.5 with 1050 double density disks: add the free sectors from VTOC2 at sector 1024.
+			if sectors.count >= 1024 {
+				if let vtoc2 = sector(number:1024) {
+					count += Int(vtoc2[122]) + 256 * Int(vtoc2[123])
+				}
+			}
+		}
+		return count
+	}
+
 	
 }
