@@ -107,7 +107,7 @@
 
 - (NSArray<NSDictionary*>*)directory {
 	// Make sure the main sectors are large enough for Atari DOS directory structure.
-	if (_mainSectorSize == 0 || self.sectors.count < 720) {
+	if (_mainSectorSize == 0 || self.sectors.count < 368) {
 		NSLog(@"[LK] Invalid disk image!");
 		return nil;
 	}
@@ -135,6 +135,8 @@
 					entry[@"filename"] = [self stringWithChars:dirEntry+5 maxLength:8];
 					entry[@"ext"] = [self stringWithChars:dirEntry+13 maxLength:3];
 					
+					entry[@"index"] = @(entryIndex + 8 * sectorOffset);
+					
 					NSLog(@"%02x %@.%@ %d %d", flags, entry[@"filename"], entry[@"ext"], length, start);
 					[results addObject:entry];
 				} // end if (flags)
@@ -159,6 +161,86 @@
 	return result;
 }
 
+- (BOOL) setFilename:(NSString *)filename atIndex:(NSUInteger)index {
+	return NO;
+}
+
+- (BOOL) setLocked:(BOOL)locked atIndex:(NSUInteger)index {
+	NSData *oldData = [self rawDirectoryEntryAtIndex:index];
+	if (oldData == nil) {
+		return NO;
+	}
+	
+	NSMutableData *modifiedData = [NSMutableData dataWithData:oldData];
+	UInt8 *rawPtr = modifiedData.mutableBytes;
+	
+	if (locked) {
+		rawPtr[0] = rawPtr[0] | 0x20; // set lock bit
+	} else {
+		rawPtr[0] = rawPtr[0] & ~0x20; // clear lock bit
+	}
+	return [self setRawDirectoryEntry:modifiedData atIndex:index];
+ }
+
+- (NSData *)rawDirectoryEntryAtIndex:(NSUInteger)index {
+	if (index >= 64) {
+		NSLog(@"[LK] Invalid directory entry index.");
+		return nil;
+	}
+	if ([self isDos2FormatDisk] == NO) {
+		NSLog(@"[LK] Unable to modify disk because it is not in DOS 2.x format.");
+		return nil;
+	}
+
+	const NSUInteger sectorNumber = 361 + index / 8;
+	NSUInteger byteOffset = index % 8 * 16;
+	NSData *sectorData = [self dataInSector:sectorNumber];
+	if (sectorData.length < 128) {
+		NSLog(@"[LK] Invalid sector size.");
+		return nil;
+	}
+	return [sectorData subdataWithRange:NSMakeRange(byteOffset, 16)];
+}
+
+- (BOOL)setRawDirectoryEntry:(NSData *)data atIndex:(NSUInteger)index {
+	if (index >= 64) {
+		NSLog(@"[LK] Invalid directory entry index.");
+		return NO;
+	}
+	if ([self isDos2FormatDisk] == NO) {
+		NSLog(@"[LK] Unable to modify disk because it is not in DOS 2.x format.");
+		return NO;
+	}
+	if (data.length != 16) {
+		NSLog(@"[LK] Incorrect length for modified directory entry data.");
+		return NO;
+	}
+	
+	const NSUInteger sectorNumber = 361 + index / 8;
+	NSUInteger byteOffset = index % 8 * 16;
+	NSData *sectorData = [self dataInSector:sectorNumber];
+	if (sectorData.length < 128) {
+		NSLog(@"[LK] Invalid sector size.");
+		return NO;
+	}
+	NSMutableData *modifiedData = [NSMutableData dataWithData:sectorData];
+	[modifiedData replaceBytesInRange:NSMakeRange(byteOffset, 16) withBytes:data.bytes];
+	[self writeData:modifiedData inSector:sectorNumber];
+	return YES;
+}
+
+
+- (BOOL) isDos2FormatDisk {
+	// Returns YES if the dosCode in the VTOC is 2, indicating a DOS 2.x-compatible disk.
+	UInt8 dosCode = 0;
+	NSData *vtocData = [self dataInSector:360];
+	if (vtocData) {
+		const UInt8 *vtocPtr = vtocData.bytes;
+		dosCode = vtocPtr[0];
+	}
+	return dosCode == 2;
+}
+
 - (NSUInteger) diskImageSize {
 	NSUInteger result = 0;
 	for (NSData *sectorData in self.sectors) {
@@ -168,13 +250,25 @@
 }
 
 - (NSUInteger) freeSectorCount {
-	NSUInteger result = 0;
-	NSData *vtoc = [self dataInSector:360];
-	if (vtoc) {
-		const UInt8 *vtocPtr = vtoc.bytes;
-		result = vtocPtr[3] + vtocPtr[4] * 256;
+	NSUInteger count = 0;
+	NSData *vtocData = [self dataInSector:360];
+	if (vtocData) {
+		const UInt8 *vtocPtr = vtocData.bytes;
+		UInt8 dosCode = vtocPtr[0];
+		if (dosCode == 2) {
+			count = vtocPtr[3] + vtocPtr[4] * 256;
+			
+			// Special case for DOS 2.5 with 1050 double density disks: add the free sectors from VTOC2.
+			if (self.sectors.count >= 1024) {
+				NSData *vtoc2Data = [self dataInSector:1024];
+				if (vtoc2Data) {
+					const UInt8 *vtoc2Ptr = vtoc2Data.bytes;
+					count += vtoc2Ptr[122] + vtoc2Ptr[123] * 256;
+				}
+			}
+		}
 	}
-	return result;
+	return count;
 }
 
 - (NSData *) dataInSector:(NSUInteger)sectorNumber {

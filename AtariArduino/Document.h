@@ -16,6 +16,9 @@
 
 
 - (NSArray<NSDictionary*>*) directory;
+- (BOOL) setFilename:(NSString *)filename atIndex:(NSUInteger)index;
+- (BOOL) setLocked:(BOOL)locked atIndex:(NSUInteger)index;
+
 - (NSUInteger) diskImageSize;
 - (NSUInteger) freeSectorCount;
 

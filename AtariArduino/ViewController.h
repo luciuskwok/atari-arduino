@@ -16,5 +16,9 @@
 
 @property (strong, nonatomic) NSArray<NSDictionary *> *directory;
 
+- (IBAction)toggleItemLock:(id)sender;
+- (IBAction)renameItem:(id)sender;
+
+
 @end
 
