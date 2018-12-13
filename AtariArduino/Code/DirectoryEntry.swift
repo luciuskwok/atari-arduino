@@ -38,7 +38,7 @@ struct DirectoryEntry {
 		var result = String()
 		for c in directoryData {
 			if c == 0 || c == 0x20 {
-				break;
+				break
 			}
 			result.append(String(format:"%c", c))
 		}
@@ -101,7 +101,7 @@ struct DirectoryEntry {
 		// Filename
 		let filenameAscii = asciiData(string:filename)
 		for index in 0..<8 {
-			var c = UInt8(0x20);
+			var c = UInt8(0x20)
 			if index < filenameAscii.count {
 				c = filenameAscii[index]
 			}
@@ -111,7 +111,7 @@ struct DirectoryEntry {
 		// Extension
 		let extAscii = asciiData(string:fileExtension)
 		for index in 0..<3 {
-			var c = UInt8(0x20);
+			var c = UInt8(0x20)
 			if index < extAscii.count {
 				c = extAscii[index]
 			}

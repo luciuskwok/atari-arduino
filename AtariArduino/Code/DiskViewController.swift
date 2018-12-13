@@ -9,17 +9,25 @@
 import Cocoa
 
 class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSMenuItemValidation {
-	
+	// IBOutlets
 	@IBOutlet weak var directoryTableView:NSTableView?
 	@IBOutlet weak var statusLabel:NSTextField?
+	
+	// Variables
 	var directory = [DirectoryEntry]()
+	
+	// Constants
+	let acceptableDragTypes:[NSPasteboard.PasteboardType] = [.fileURL]
 	
 	// MARK: -
 	
 	override func viewDidLoad() {
 		 super.viewDidLoad()
+		
 		directoryTableView?.delegate = self
 		directoryTableView?.dataSource = self
+		directoryTableView?.doubleAction = #selector(renameItem(_:))
+		directoryTableView?.registerForDraggedTypes(acceptableDragTypes)
 		
 		let nc = NotificationCenter.default
 		nc.addObserver(forName: .NSUndoManagerDidUndoChange, object: nil, queue: nil) { _ in
@@ -86,7 +94,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 		case "size":
 			text = String(format:"%u", entry.length)
 		default:
-			break;
+			break
 		}
 		
 		if let cellView = tableView.makeView(withIdentifier: tableColumn!.identifier, owner: nil) as? NSTableCellView {
@@ -96,25 +104,31 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 		return nil
 	}
 	
-	// MARK: - IBActions
-	
-	@IBAction func didRenameItem(_ sender:Any?) {
-		if let field = sender as? NSTextField, let disk = diskImage() {
-			let row = directoryTableView!.selectedRow
-			if row != NSNotFound {
-				var entry = directory[row]
-				entry.setFilenameWithExtension(field.stringValue)
-				// Setting the filename will also apply constraints to the filename.ext, so make sure that those constraints didn't result in an empty filename
-				if entry.filename.count > 0 {
-					disk.undoManager?.setActionName(NSLocalizedString("Rename", comment:""))
-					directory[row] = entry
-					disk.updateDirectory(entry: entry, at: entry.index)
+	func tableView(_ tableView: NSTableView, writeRowsWith rowIndexes: IndexSet, to pboard: NSPasteboard) -> Bool {
+		var valid = false
+		if let disk = diskImage() {
+			for row in rowIndexes {
+				let entry = directory[row]
+				let sectorNumber = Int(entry.start)
+				let fileNumber = entry.index
+				if let fileContents = disk.fileContents(startingSectorNumber: sectorNumber, fileNumber: fileNumber) {
+					let fileWrapper = FileWrapper(regularFileWithContents: fileContents)
+					fileWrapper.filename = entry.filenameWithExtension()
+					if pboard.write(fileWrapper) {
+						valid = true
+					}
 				}
-				// Reload here because the text field might need to be reset to actual value after editing.
-				reloadDirectory()
 			}
 		}
+		return valid
 	}
+	
+	func tableView(_ tableView:NSTableView, validateDrop info:NSDraggingInfo, proposedRow row:Int, proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
+		// TODO: ???
+		return NSDragOperation.generic
+	}
+	
+	// MARK: - IBActions
 	
 	@IBAction func toggleItemLock(_ sender:Any?) {
 		let selectedRows = directoryTableView!.selectedRowIndexes
@@ -138,8 +152,26 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 
 	@IBAction func renameItem(_ sender:Any?) {
 		let row = directoryTableView!.selectedRow
-		if row != NSNotFound {
+		if 0 <= row && row < directory.count {
 			directoryTableView?.editColumn(1, row: row, with: nil, select: true)
+		}
+	}
+	
+	@IBAction func didRenameItem(_ sender:Any?) {
+		if let field = sender as? NSTextField, let disk = diskImage() {
+			let row = directoryTableView!.selectedRow
+			if row != NSNotFound {
+				var entry = directory[row]
+				entry.setFilenameWithExtension(field.stringValue)
+				// Setting the filename will also apply constraints to the filename.ext, so make sure that those constraints didn't result in an empty filename
+				if entry.filename.count > 0 {
+					disk.undoManager?.setActionName(NSLocalizedString("Rename", comment:""))
+					directory[row] = entry
+					disk.updateDirectory(entry: entry, at: entry.index)
+				}
+				// Reload here because the text field might need to be reset to actual value after editing.
+				reloadDirectory()
+			}
 		}
 	}
 	

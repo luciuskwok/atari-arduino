@@ -9,10 +9,12 @@
 import AppKit
 
 class AtariDiskImage: NSDocument {
-	var bootSectorSize = 128
+	// Variables
 	var mainSectorSize = 128
 	var sectors = [Data]()
 	
+	// Constants
+	let bootSectorSize = 128
 	let directoryStartSectorNumber = 361
 
 	// MARK: -
@@ -177,6 +179,33 @@ class AtariDiskImage: NSDocument {
 			writeSector(number:sectorNumber, data:modifiedSectorData)
 		}
 	}
+	
+	func fileContents(startingSectorNumber: Int, fileNumber: Int) -> Data? {
+		if isDos2FormatDisk() == false {
+			return nil
+		}
+
+		var fileData = Data()
+		var sectorNumber = startingSectorNumber
+		while sectorNumber != 0 {
+			if let sectorData = sector(number:sectorNumber) {
+				let validationNumber = Int(sectorData[125] & 0xFC) / 4
+				let nextSectorNumber = Int(sectorData[126]) + 256 * Int(sectorData[125] & 0x03)
+				let length = Int(sectorData[127])
+				if validationNumber == fileNumber {
+					fileData.append(sectorData.subdata(in: 0..<length))
+					sectorNumber = nextSectorNumber
+				} else {
+					NSLog("[LK] File number mismatch.")
+					return nil
+				}
+			} else {
+				NSLog("[LK] Sector not found.")
+				return nil
+			}
+		}
+		return fileData
+	}
 
 	// MARK: - Stats
 	
@@ -184,7 +213,7 @@ class AtariDiskImage: NSDocument {
 		var dosCode:UInt8 = 0
 		if mainSectorSize > 0 && sectors.count >= directoryStartSectorNumber + 8 {
 			if let vtoc = sector(number:360) {
-				dosCode = vtoc[0];
+				dosCode = vtoc[0]
 			}
 		}
 		return dosCode
