@@ -17,17 +17,21 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 	var directory = [DirectoryEntry]()
 	
 	// Constants
-	let acceptableDragTypes:[NSPasteboard.PasteboardType] = [.fileURL]
+	let acceptableDragTypes:[NSPasteboard.PasteboardType] = [.filePromise]
 	
 	// MARK: -
 	
 	override func viewDidLoad() {
 		 super.viewDidLoad()
 		
-		directoryTableView?.delegate = self
-		directoryTableView?.dataSource = self
-		directoryTableView?.doubleAction = #selector(renameItem(_:))
-		directoryTableView?.registerForDraggedTypes(acceptableDragTypes)
+		if let tv = directoryTableView {
+			tv.delegate = self
+			tv.dataSource = self
+			tv.doubleAction = #selector(renameItem(_:))
+			tv.registerForDraggedTypes(acceptableDragTypes)
+			tv.setDraggingSourceOperationMask(.copy, forLocal: false) // Allow copying out of app.
+		}
+		
 		
 		let nc = NotificationCenter.default
 		nc.addObserver(forName: .NSUndoManagerDidUndoChange, object: nil, queue: nil) { _ in
@@ -105,27 +109,51 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 	}
 	
 	func tableView(_ tableView: NSTableView, writeRowsWith rowIndexes: IndexSet, to pboard: NSPasteboard) -> Bool {
-		var valid = false
+		var fileExtensions = [String]()
+		for row in rowIndexes {
+			let anExt = directory[row].fileExtension
+			if anExt.count > 0 {
+				fileExtensions.append(anExt)
+			} else {
+				fileExtensions.append("bin")
+			}
+		}
+		if fileExtensions.count > 0 {
+			pboard.setPropertyList(fileExtensions, forType: .filePromise)
+		}
+		return fileExtensions.count > 0
+	}
+	
+	func tableView(_ tableView: NSTableView, namesOfPromisedFilesDroppedAtDestination dropDestination: URL, forDraggedRowsWith rowIndexes: IndexSet) -> [String] {
+		var filenames = [String]()
 		if let disk = diskImage() {
 			for row in rowIndexes {
 				let entry = directory[row]
-				let sectorNumber = Int(entry.start)
-				let fileNumber = entry.index
-				if let fileContents = disk.fileContents(startingSectorNumber: sectorNumber, fileNumber: fileNumber) {
-					let fileWrapper = FileWrapper(regularFileWithContents: fileContents)
-					fileWrapper.filename = entry.filenameWithExtension()
-					if pboard.write(fileWrapper) {
-						valid = true
+				let aFilename = entry.filenameWithExtension()
+				
+				// Write files to path
+				let path = dropDestination.appendingPathComponent(aFilename)
+				if let fileContents = disk.fileContents(startingSectorNumber: Int(entry.start), fileNumber: entry.fileNumber) {
+					do {
+						try fileContents.write(to: path)
+						filenames.append(aFilename)
+					} catch {
+						NSLog("[LK] Error writing file to disk.")
 					}
 				}
 			}
 		}
-		return valid
+		return filenames
 	}
 	
 	func tableView(_ tableView:NSTableView, validateDrop info:NSDraggingInfo, proposedRow row:Int, proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
 		// TODO: ???
 		return NSDragOperation.generic
+	}
+	
+	func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
+		// TODO: write code to accept drops
+		return false
 	}
 	
 	// MARK: - IBActions
@@ -144,7 +172,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 				var entry = directory[row]
 				entry.setLocked(newLockState)
 				directory[row] = entry
-				disk.updateDirectory(entry: entry, at: entry.index)
+				disk.updateDirectory(entry: entry, at: entry.fileNumber)
 			}
 			reloadDirectory()
 		}
@@ -167,7 +195,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 				if entry.filename.count > 0 {
 					disk.undoManager?.setActionName(NSLocalizedString("Rename", comment:""))
 					directory[row] = entry
-					disk.updateDirectory(entry: entry, at: entry.index)
+					disk.updateDirectory(entry: entry, at: entry.fileNumber)
 				}
 				// Reload here because the text field might need to be reset to actual value after editing.
 				reloadDirectory()

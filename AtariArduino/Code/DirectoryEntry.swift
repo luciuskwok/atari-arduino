@@ -9,7 +9,7 @@
 import Foundation
 
 struct DirectoryEntry {
-	var index:Int
+	var fileNumber:Int
 	var flags:UInt8
 	var length:UInt16
 	var start:UInt16
@@ -17,7 +17,7 @@ struct DirectoryEntry {
 	var fileExtension:String
 	
 	init() {
-		index = 0
+		fileNumber = 0
 		flags = 0
 		length = 0
 		start = 0
@@ -26,7 +26,7 @@ struct DirectoryEntry {
 	}
 	
 	init(atariData:Data, index:Int) {
-		self.index = index
+		self.fileNumber = index
 		flags = atariData[0]
 		length = UInt16(atariData[1]) + 256 * UInt16(atariData[2])
 		start = UInt16(atariData[3]) + 256 * UInt16(atariData[4])
