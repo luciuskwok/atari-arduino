@@ -71,14 +71,14 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			case 0:
 				statusLabel?.stringValue = String(format:"Unformatted %d KB disk", diskSize)
 			case 2:
-				statusLabel?.stringValue = String(format:"%d sectors free, %d KB disk", freeSectors, diskSize)
+				statusLabel?.stringValue = String(format:"%d free sectors, %d KB disk", freeSectors, diskSize)
 			default:
 				statusLabel?.stringValue = String(format:"Unsupported %d KB disk", diskSize)
 			}
 			
 			// TEST
 			let vtocFree = disk.freeSectorsFromVTOC()
-			NSLog("[LK] Bitmap free sectors: \(vtocFree)")
+			NSLog("[LK] Bitmap free sectors: \(vtocFree.count)")
 		}
 	}
 	
@@ -206,16 +206,32 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			}
 		}
 	}
-	
+
+	@IBAction func delete(_ sender:Any?) {
+		let selectedRows = directoryTableView!.selectedRowIndexes
+		if selectedRows.count > 0, let disk = diskImage() {
+			for row in selectedRows {
+				let entry = directory[row]
+				if entry.isLocked() == false {
+					disk.delete(fileNumber: entry.fileNumber)
+				}
+			}
+			reloadDirectory()
+		}
+	}
+
 	func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
 		var enableItem = false
 		let selection = directoryTableView!.selectedRowIndexes
+		var firstItemLocked = true
+		if let row = selection.first {
+			firstItemLocked = directory[row].isLocked()
+		}
 		
 		switch menuItem.action {
 		case #selector(toggleItemLock(_:)): // Lock/Unlock
-			if let row = selection.first {
-				let entry = directory[row]
-				if entry.isLocked() {
+			if selection.count > 0 {
+				if firstItemLocked {
 					menuItem.title = NSLocalizedString("Unlock", comment:"")
 				} else {
 					menuItem.title = NSLocalizedString("Lock", comment:"")
@@ -224,7 +240,19 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			}
 			
 		case #selector(renameItem(_:)): // Rename
-			enableItem = (selection.count == 1)
+			if selection.count == 1 {
+				enableItem = !firstItemLocked
+			}
+			
+		case #selector(delete(_:)): // Delete
+			if selection.count > 0 {
+				// Only allow delete if at least 1 item is unlocked
+				for row in selection {
+					if directory[row].isLocked() == false {
+						enableItem = true
+					}
+				}
+			}
 			
 		default:
 			break

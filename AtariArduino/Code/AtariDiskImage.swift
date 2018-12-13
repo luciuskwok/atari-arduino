@@ -183,7 +183,7 @@ class AtariDiskImage: NSDocument {
 	func tailInfo(sectorData:Data) -> (fileNumber:Int, nextSector:Int, length:Int) {
 		let end = sectorData.count - 1
 		let fileNo = Int(sectorData[end - 2] & 0xFC) / 4
-		let next = Int(sectorData[end - 2]) + 256 * Int(sectorData[end - 1] & 0x03)
+		let next = Int(sectorData[end - 1]) + 256 * Int(sectorData[end - 2] & 0x03)
 		let len = Int(sectorData[end])
 		return (fileNo, next, len)
 	}
@@ -206,7 +206,7 @@ class AtariDiskImage: NSDocument {
 					return nil
 				}
 			} else {
-				NSLog("[LK] Sector not found.")
+				NSLog("[LK] Invalid sector number.")
 				return nil
 			}
 		}
@@ -257,12 +257,12 @@ class AtariDiskImage: NSDocument {
 				// Write updated VTOC
 				var freeSectors = freeSectorsFromVTOC()
 				for n in sectorsToFree {
-					freeSectors.remove(n)
+					freeSectors.insert(n)
 				}
 				writeVTOC(freeSectors: freeSectors)
 			}
 
-			
+			NSLog("[LK] Freed \(sectorsToFree.count) sectors.")
 		}
 	}
 
@@ -321,7 +321,7 @@ class AtariDiskImage: NSDocument {
 				for index in 10...99 {
 					let byte = vtoc[index]
 					for bit in 0..<8 {
-						if (byte & (1 << bit)) != 0 {
+						if (byte & (0x80 >> bit)) != 0 {
 							freeSectors.insert(sectorNumber)
 						}
 						sectorNumber += 1
@@ -334,7 +334,7 @@ class AtariDiskImage: NSDocument {
 					for index in 84...121 {
 						let byte = vtoc2[index]
 						for bit in 0..<8 {
-							if (byte & (1 << bit)) != 0 {
+							if (byte & (0x80 >> bit)) != 0 {
 								freeSectors.insert(sectorNumber)
 							}
 							sectorNumber += 1
@@ -371,7 +371,7 @@ class AtariDiskImage: NSDocument {
 			var byte = UInt8(0)
 			for bit in 0..<8 {
 				if freeSectors.contains(index * 8 + bit) {
-					byte = byte | (1 << bit)
+					byte = byte | (0x80 >> bit)
 				}
 				vtoc[10 + index] = byte
 			}
@@ -390,7 +390,7 @@ class AtariDiskImage: NSDocument {
 				var byte = UInt8(0)
 				for bit in 0..<8 {
 					if freeSectors.contains(48 + index * 8 + bit) {
-						byte = byte | (1 << bit)
+						byte = byte | (0x80 >> bit)
 					}
 					vtoc2[index] = byte
 				}
