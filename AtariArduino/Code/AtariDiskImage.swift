@@ -156,7 +156,7 @@ class AtariDiskImage: NSDocument {
 					let entryData = sectorData.subdata(in: offset..<offset+16)
 					let flags = entryData[0]
 					if (flags & 0x80) == 0 && (flags & 0x40) != 0 {
-						let entry = DirectoryEntry(atariData:entryData, index:entryIndex + 8 * dirSectorOffset)
+						let entry = DirectoryEntry(atariData:entryData, fileNumber:entryIndex + 8 * dirSectorOffset)
 						dir.append(entry)
 					} // end if (flags)
 				} // end for (entryIndex)
@@ -180,6 +180,14 @@ class AtariDiskImage: NSDocument {
 		}
 	}
 	
+	func tailInfo(sectorData:Data) -> (fileNumber:Int, nextSector:Int, length:Int) {
+		let end = sectorData.count - 1
+		let fileNo = Int(sectorData[end - 2] & 0xFC) / 4
+		let next = Int(sectorData[end - 2]) + 256 * Int(sectorData[end - 1] & 0x03)
+		let len = Int(sectorData[end])
+		return (fileNo, next, len)
+	}
+	
 	func fileContents(startingSectorNumber: Int, fileNumber: Int) -> Data? {
 		if isDos2FormatDisk() == false {
 			return nil
@@ -189,12 +197,10 @@ class AtariDiskImage: NSDocument {
 		var sectorNumber = startingSectorNumber
 		while sectorNumber != 0 {
 			if let sectorData = sector(number:sectorNumber) {
-				let validationNumber = Int(sectorData[125] & 0xFC) / 4
-				let nextSectorNumber = Int(sectorData[126]) + 256 * Int(sectorData[125] & 0x03)
-				let length = Int(sectorData[127])
-				if validationNumber == fileNumber {
+				let (validation, next, length) = tailInfo(sectorData: sectorData)
+				if validation == fileNumber {
 					fileData.append(sectorData.subdata(in: 0..<length))
-					sectorNumber = nextSectorNumber
+					sectorNumber = next
 				} else {
 					NSLog("[LK] File number mismatch.")
 					return nil
@@ -205,6 +211,59 @@ class AtariDiskImage: NSDocument {
 			}
 		}
 		return fileData
+	}
+	
+	func delete(fileNumber:Int) {
+		if isDos2FormatDisk() {
+			// Get directory entry
+			let sectorData = sector(number:directoryStartSectorNumber + fileNumber / 8)!
+			let byteOffset = fileNumber % 8 * 16
+			let entryData = sectorData.subdata(in: byteOffset..<byteOffset+16)
+			let flags = entryData[0]
+			
+			// Validate flags
+			if flags != 0x42 && flags != 0x03 {
+				NSLog("[LK] File is not valid.")
+				return
+			}
+
+			// Walk through file to determine which sectors to free
+			var entry = DirectoryEntry(atariData: entryData, fileNumber: fileNumber)
+			var sectorNumber = Int(entry.start)
+			var sectorsToFree = IndexSet()
+			while sectorNumber != 0 {
+				
+				if let sectorData = sector(number:sectorNumber) {
+					let (validation, next, _) = tailInfo(sectorData: sectorData)
+					if (fileNumber != validation) {
+						NSLog("[LK] File number mismatch.")
+						return
+					} else {
+						sectorsToFree.insert(sectorNumber)
+						sectorNumber = next
+					}
+				} else {
+					NSLog("[LK] Invalid sector number.")
+					return
+				}
+			}
+
+			// Update the VTOC and directory only after making sure every sector matches the file to be deleted
+			if sectorsToFree.count > 0 {
+				// Mark directory entry as deleted
+				entry.flags = 0x80
+				updateDirectory(entry: entry, at: fileNumber)
+				
+				// Write updated VTOC
+				var freeSectors = freeSectorsFromVTOC()
+				for n in sectorsToFree {
+					freeSectors.remove(n)
+				}
+				writeVTOC(freeSectors: freeSectors)
+			}
+
+			
+		}
 	}
 
 	// MARK: - Stats
@@ -251,6 +310,96 @@ class AtariDiskImage: NSDocument {
 			}
 		}
 		return count
+	}
+	
+	func freeSectorsFromVTOC() -> IndexSet {
+		var freeSectors = IndexSet()
+		if isDos2FormatDisk() {
+			var sectorNumber = 0
+			
+			if let vtoc = sector(number:360) {
+				for index in 10...99 {
+					let byte = vtoc[index]
+					for bit in 0..<8 {
+						if (byte & (1 << bit)) != 0 {
+							freeSectors.insert(sectorNumber)
+						}
+						sectorNumber += 1
+					}
+				}
+			}
+			
+			if sectors.count >= 1024 {
+				if let vtoc2 = sector(number:1024) {
+					for index in 84...121 {
+						let byte = vtoc2[index]
+						for bit in 0..<8 {
+							if (byte & (1 << bit)) != 0 {
+								freeSectors.insert(sectorNumber)
+							}
+							sectorNumber += 1
+						}
+					}
+				}
+			}
+		}
+		
+		return freeSectors;
+	}
+	
+	func writeVTOC(freeSectors:IndexSet) {
+		if isDos2FormatDisk() == false {
+			NSLog("[LK] Cannot update a disk that not DOS 2.x")
+			return
+		}
+		
+		var lowerFreeSectorCount = 0
+		var upperFreeSectorCount = 0
+		for n in freeSectors {
+			if n < 720 {
+				lowerFreeSectorCount += 1
+			} else {
+				upperFreeSectorCount += 1
+			}
+		}
+		
+		// VTOC (DOS 2.0 and 2.5)
+		var vtoc = sector(number: 360)!
+		vtoc[3] = UInt8(lowerFreeSectorCount % 256)
+		vtoc[4] = UInt8(lowerFreeSectorCount / 256)
+		for index in 0..<90 { // Compress IndexSet into bitmap
+			var byte = UInt8(0)
+			for bit in 0..<8 {
+				if freeSectors.contains(index * 8 + bit) {
+					byte = byte | (1 << bit)
+				}
+				vtoc[10 + index] = byte
+			}
+		}
+		for index in 100...127 { // Zero out unused bytes
+			vtoc[index] = 0
+		}
+		writeSector(number: 360, data: vtoc)
+
+		// VTOC2 (DOS 2.5 on Enhanced Density)
+		if sectors.count >= 1024 {
+			var vtoc2 = sector(number: 1024)!
+			vtoc2[122] = UInt8(upperFreeSectorCount % 256)
+			vtoc2[123] = UInt8(upperFreeSectorCount / 256)
+			for index in 0...121 {
+				var byte = UInt8(0)
+				for bit in 0..<8 {
+					if freeSectors.contains(48 + index * 8 + bit) {
+						byte = byte | (1 << bit)
+					}
+					vtoc2[index] = byte
+				}
+			}
+			for index in 124...127 { // Zero out unused bytes
+				vtoc[index] = 0
+			}
+			writeSector(number: 1024, data: vtoc2)
+		}
 	}
 
 	

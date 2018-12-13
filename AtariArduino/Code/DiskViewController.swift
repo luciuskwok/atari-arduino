@@ -30,8 +30,8 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			tv.doubleAction = #selector(renameItem(_:))
 			tv.registerForDraggedTypes(acceptableDragTypes)
 			tv.setDraggingSourceOperationMask(.copy, forLocal: false) // Allow copying out of app.
+			tv.draggingDestinationFeedbackStyle = .none
 		}
-		
 		
 		let nc = NotificationCenter.default
 		nc.addObserver(forName: .NSUndoManagerDidUndoChange, object: nil, queue: nil) { _ in
@@ -75,6 +75,10 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			default:
 				statusLabel?.stringValue = String(format:"Unsupported %d KB disk", diskSize)
 			}
+			
+			// TEST
+			let vtocFree = disk.freeSectorsFromVTOC()
+			NSLog("[LK] Bitmap free sectors: \(vtocFree)")
 		}
 	}
 	
@@ -131,7 +135,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 				let entry = directory[row]
 				let aFilename = entry.filenameWithExtension()
 				
-				// Write files to path
+				// Write files to disk
 				let path = dropDestination.appendingPathComponent(aFilename)
 				if let fileContents = disk.fileContents(startingSectorNumber: Int(entry.start), fileNumber: entry.fileNumber) {
 					do {

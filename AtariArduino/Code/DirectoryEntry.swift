@@ -25,7 +25,7 @@ struct DirectoryEntry {
 		fileExtension = ""
 	}
 	
-	init(atariData:Data, index:Int) {
+	init(atariData:Data, fileNumber index:Int) {
 		self.fileNumber = index
 		flags = atariData[0]
 		length = UInt16(atariData[1]) + 256 * UInt16(atariData[2])
