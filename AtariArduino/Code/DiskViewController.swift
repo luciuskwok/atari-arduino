@@ -20,6 +20,14 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 		 super.viewDidLoad()
 		directoryTableView?.delegate = self
 		directoryTableView?.dataSource = self
+		
+		let nc = NotificationCenter.default
+		nc.addObserver(forName: .NSUndoManagerDidUndoChange, object: nil, queue: nil) { _ in
+			self.reloadDirectory()
+		}
+		nc.addObserver(forName: .NSUndoManagerDidRedoChange, object: nil, queue: nil) { _ in
+			self.reloadDirectory()
+		}
 	}
 	
 	override func viewWillAppear() {
@@ -47,12 +55,13 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			// Update status label
 			let diskSize = disk.size() / 1024
 			let freeSectors = disk.freeSectorCount()
-			if disk.isDos2FormatDisk() == false {
-				statusLabel?.stringValue = "Not a DOS 2.x disk"
-			} else if freeSectors == 0 {
+			switch disk.dosCode() {
+			case 0:
 				statusLabel?.stringValue = String(format:"Unformatted %d KB disk", diskSize)
-			} else {
+			case 2:
 				statusLabel?.stringValue = String(format:"%d sectors free, %d KB disk", freeSectors, diskSize)
+			default:
+				statusLabel?.stringValue = String(format:"Unsupported %d KB disk", diskSize)
 			}
 		}
 	}
@@ -94,13 +103,15 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			let row = directoryTableView!.selectedRow
 			if row != NSNotFound {
 				var entry = directory[row]
-				let newText = field.stringValue
-				if newText.count > 0 {
-					entry.setFilenameWithExtension(newText)
+				entry.setFilenameWithExtension(field.stringValue)
+				// Setting the filename will also apply constraints to the filename.ext, so make sure that those constraints didn't result in an empty filename
+				if entry.filename.count > 0 {
+					disk.undoManager?.setActionName(NSLocalizedString("Rename", comment:""))
 					directory[row] = entry
 					disk.updateDirectory(entry: entry, at: entry.index)
-					reloadDirectory()
 				}
+				// Reload here because the text field might need to be reset to actual value after editing.
+				reloadDirectory()
 			}
 		}
 	}
@@ -110,6 +121,11 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 		if selectedRows.count > 0, let disk = diskImage() {
 			let firstSelectedRow = directoryTableView!.selectedRowIndexes.first!
 			let newLockState = !directory[firstSelectedRow].isLocked()
+			if (newLockState) {
+				disk.undoManager?.setActionName(NSLocalizedString("Lock", comment:""))
+			} else {
+				disk.undoManager?.setActionName(NSLocalizedString("Unlock", comment:""))
+			}
 			for row in directoryTableView!.selectedRowIndexes {
 				var entry = directory[row]
 				entry.setLocked(newLockState)
@@ -151,5 +167,6 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 		}
 		return enableItem
 	}
+	
 	
 }

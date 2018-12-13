@@ -12,7 +12,7 @@ class AtariDiskImage: NSDocument {
 	var bootSectorSize = 128
 	var mainSectorSize = 128
 	var sectors = [Data]()
-
+	
 	let directoryStartSectorNumber = 361
 
 	// MARK: -
@@ -37,8 +37,32 @@ class AtariDiskImage: NSDocument {
 	// MARK: - Mac I/O
 	
 	override func data(ofType typeName: String) throws -> Data {
-		// TODO
-		return Data()
+		var outData = Data(capacity: 1040 * 128)
+		
+		// == Header ==
+		// Magic word 0x0296
+		outData.append(0x96)
+		outData.append(0x02)
+		
+		// Disk size divided by 16
+		let diskSizeInParagraphs = size() / 16
+		outData.append(UInt8(diskSizeInParagraphs % 256))
+		outData.append(UInt8(diskSizeInParagraphs / 256))
+		
+		// Sector size
+		outData.append(UInt8(mainSectorSize % 256))
+		outData.append(UInt8(mainSectorSize / 256))
+		
+		// Pad out header to 16 bytes
+		outData.count = 16
+		
+		// == Sector Data ==
+		for sectorData in sectors {
+			outData.append(sectorData)
+		}
+
+		//throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError, userInfo: nil)
+		return outData
 	}
 	
 	override func read(from data: Data, ofType typeName: String) throws {
@@ -109,6 +133,8 @@ class AtariDiskImage: NSDocument {
 		if number == 0 || number > sectors.count {
 			NSLog("[LK] Invalid disk sector number")
 		} else {
+			let originalData = sectors[number - 1]
+			undoManager?.registerUndo(withTarget: self, handler: { $0.writeSector(number:number, data:originalData) })
 			sectors[number - 1] = data
 		}
 	}
@@ -145,24 +171,28 @@ class AtariDiskImage: NSDocument {
 		
 		let sectorNumber = directoryStartSectorNumber + index / 8
 		let byteOffset = index % 8 * 16
-		if var sectorData = sector(number:sectorNumber) {
-			sectorData.replaceSubrange(byteOffset..<byteOffset+16, with: entry.atariData())
-			writeSector(number:sectorNumber, data:sectorData)
+		if let originalSectorData = sector(number:sectorNumber) {
+			var modifiedSectorData = originalSectorData
+			modifiedSectorData.replaceSubrange(byteOffset..<byteOffset+16, with: entry.atariData())
+			writeSector(number:sectorNumber, data:modifiedSectorData)
 		}
 	}
 
 	// MARK: - Stats
 	
+	func dosCode() -> UInt8 {
+		var dosCode:UInt8 = 0
+		if mainSectorSize > 0 && sectors.count >= directoryStartSectorNumber + 8 {
+			if let vtoc = sector(number:360) {
+				dosCode = vtoc[0];
+			}
+		}
+		return dosCode
+	}
+	
 	func isDos2FormatDisk() -> Bool {
 		// Returns YES if the dosCode in the VTOC is 2, indicating a DOS 2.x-compatible disk.
-		if mainSectorSize == 0 || sectors.count < directoryStartSectorNumber + 8 {
-			return false
-		}
-		var dosCode:UInt8 = 0
-		if let vtoc = sector(number:360) {
-			dosCode = vtoc[0];
-		}
-		return dosCode == 2
+		return dosCode() == 2
 	}
 	
 	func size() -> Int {

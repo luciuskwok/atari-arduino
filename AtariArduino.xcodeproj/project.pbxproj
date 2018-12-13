@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		E02309A921BE3EA20021933D /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = E02309A821BE3EA20021933D /* ViewController.m */; };
-		E02309AC21BE3EA20021933D /* Document.m in Sources */ = {isa = PBXBuildFile; fileRef = E02309AB21BE3EA20021933D /* Document.m */; };
 		E02309AE21BE3EA30021933D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E02309AD21BE3EA30021933D /* Assets.xcassets */; };
 		E02309B121BE3EA30021933D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = E02309AF21BE3EA30021933D /* Main.storyboard */; };
 		E02309B421BE3EA30021933D /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = E02309B321BE3EA30021933D /* main.m */; };
@@ -20,10 +18,6 @@
 
 /* Begin PBXFileReference section */
 		E02309A121BE3EA20021933D /* AtariArduino.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AtariArduino.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E02309A721BE3EA20021933D /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
-		E02309A821BE3EA20021933D /* ViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ViewController.m; sourceTree = "<group>"; };
-		E02309AA21BE3EA20021933D /* Document.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Document.h; sourceTree = "<group>"; };
-		E02309AB21BE3EA20021933D /* Document.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Document.m; sourceTree = "<group>"; };
 		E02309AD21BE3EA30021933D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E02309B021BE3EA30021933D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		E02309B221BE3EA30021933D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -67,10 +61,6 @@
 			isa = PBXGroup;
 			children = (
 				E0C9A73E21C16E45008D9E77 /* Code */,
-				E02309A721BE3EA20021933D /* ViewController.h */,
-				E02309A821BE3EA20021933D /* ViewController.m */,
-				E02309AA21BE3EA20021933D /* Document.h */,
-				E02309AB21BE3EA20021933D /* Document.m */,
 				E02309AD21BE3EA30021933D /* Assets.xcassets */,
 				E02309AF21BE3EA30021933D /* Main.storyboard */,
 				E02309B221BE3EA30021933D /* Info.plist */,
@@ -163,9 +153,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E0C9A74521C17036008D9E77 /* AtariDiskImage.swift in Sources */,
-				E02309AC21BE3EA20021933D /* Document.m in Sources */,
 				E0C9A74221C16E45008D9E77 /* DiskViewController.swift in Sources */,
-				E02309A921BE3EA20021933D /* ViewController.m in Sources */,
 				E02309B421BE3EA30021933D /* main.m in Sources */,
 				E0C9A74321C16E45008D9E77 /* AppDelegate.swift in Sources */,
 				E0C9A74721C17F3C008D9E77 /* DirectoryEntry.swift in Sources */,

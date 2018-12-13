@@ -123,12 +123,13 @@ struct DirectoryEntry {
 	
 	func asciiData(string:String) -> Data {
 		var data = Data()
-		string.forEach {
-			(c) in
+		string.forEach { (c) in
 			if let uniChar = c.unicodeScalars.first {
 				if uniChar.isASCII {
 					let a = UInt8(uniChar.value)
-					data.append(a)
+					if a != 0 {
+						data.append(a)
+					}
 				}
 			}
 		}
