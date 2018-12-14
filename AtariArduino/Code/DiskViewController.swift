@@ -156,6 +156,15 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 		
 		//NSLog("[LK] Validate drop.")
 		
+		// TODO: Unless the option key is held down, dragging a file within the same disk image should do nothing
+		if info.draggingSource as? NSTableView == tableView {
+			if let event = NSApp.currentEvent {
+				if event.modifierFlags.contains(.option) == false {
+					return []
+				}
+			}
+		}
+		
 		// Hide the highlight of the row or space between rows.
 		tableView.setDropRow(-1, dropOperation: dropOperation)
 		

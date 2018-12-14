@@ -385,9 +385,13 @@ class AtariDiskImage: NSDocument {
 			let sectorData = sector(number: directoryStartSectorNumber + sectorIndex)!
 			for entry in 0..<8 {
 				let offset = entry * 16
-				let entryFilename = sectorData.subdata(in: offset + 5 ..< offset + 16)
-				if name == entryFilename {
-					return fileNumber
+				let entryData = sectorData.subdata(in: offset ..< offset + 16)
+				let flags = entryData[0]
+				if flags != 0 && flags != 0x80 {
+					let entryFilename = entryData.subdata(in: 5 ..< 16)
+					if name == entryFilename {
+						return fileNumber
+					}
 				}
 				fileNumber += 1
 			}
