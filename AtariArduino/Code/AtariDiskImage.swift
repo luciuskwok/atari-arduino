@@ -174,7 +174,7 @@ class AtariDiskImage: NSDocument {
 		return entryData
 	}
 	
-	func updateDirectory(entry:DirectoryEntry, at index:Int) {
+	func writeDirectory(entry:DirectoryEntry, at index:Int) {
 		// Make sure the disk image is large enough for Atari DOS directory structure.
 		if isDos2FormatDisk() == false {
 			return
@@ -260,7 +260,7 @@ class AtariDiskImage: NSDocument {
 			if sectorsToFree.count > 0 {
 				// Mark directory entry as deleted
 				entry.flags = 0x80
-				updateDirectory(entry: entry, at: fileNumber)
+				writeDirectory(entry: entry, at: fileNumber)
 				
 				// Write updated VTOC
 				var freeSectors = freeSectorsFromVTOC()
@@ -279,7 +279,7 @@ class AtariDiskImage: NSDocument {
 			return false;
 		}
 		
-		NSLog("[LK] Adding file \(name), length\(data.count)")
+		NSLog("[LK] Adding file \(name), length \(data.count)")
 		
 		// Find an available file number
 		let fileNumber = availableFileNumber()
@@ -287,26 +287,81 @@ class AtariDiskImage: NSDocument {
 			NSLog("[LK] Directory full")
 			return false
 		}
+		let shiftedFileNumber = UInt8(fileNumber) << 2
 		
 		// Convert the name into a 8.3 filename that is unique
-		var atariFilenameData = DirectoryEntry.atariData(filename: name)
-//		var extIndex = 1
-//		while findFile(named: fileName, fileExtension: fileExt) != -1 {
-//			fileExt = String(format:"%03d", extIndex)
-//			extIndex += 1
-//		}
+		var filenameData = DirectoryEntry.atariData(filename: name)
+		var extIndex = 1
+		while findFile(named: filenameData) != -1 {
+			let extData = DirectoryEntry.paddedData(string: String(format:"%03d", extIndex), length: 3)
+			filenameData.replaceSubrange(8..<11, with: extData)
+			extIndex += 1
+		}
 		
 		// Get the volume bitmap from the VTOC and check available space
+		var freeSectorSet = freeSectorsFromVTOC()
+		let maxSectorDataSize = mainSectorSize - 3
+		let bytesAvailable = freeSectorSet.count * maxSectorDataSize
+		if data.count > bytesAvailable {
+			NSLog("[LK] Insufficient space available")
+			return false
+		}
+		
+		// Convert the freeSectorSet into a sorted array so that sectors are used in order
+		var sortedFreeSectors = freeSectorSet.sorted()
+		let startSectorNumber = sortedFreeSectors.first!
 		
 		// Write the file to sectors
+		var dataIndex = 0
+		var sectorsUsed = 0
+		while dataIndex < data.count {
+			// Calculate logical sector size (the number of bytes of data the belongs to the file) as the smaller of the remaining length of data and the maximum number of bytes of data per sector, typically 127 for single density.
+			let logicalSize = min(data.count - dataIndex, maxSectorDataSize)
+			let sectorNumber = sortedFreeSectors.first!
+			
+			// Set the next sector link if there is more data and there are any more free sectors left
+			var nextSector = 0
+			if sortedFreeSectors.count >= 2 && dataIndex + logicalSize < data.count {
+				nextSector = sortedFreeSectors[1]
+			}
+			
+			// Create a sector with data, file number, next sector link, and logical size
+			var sectorData = data.subdata(in: dataIndex..<dataIndex+logicalSize)
+			if sectorData.count < maxSectorDataSize {
+				sectorData.count = maxSectorDataSize
+			}
+			
+			// File number and next sector link share bits, so mash them together
+			sectorData.append(shiftedFileNumber | UInt8(nextSector / 256))
+			sectorData.append(UInt8(nextSector % 256))
+			
+			// Last byte is the logical size of the sector
+			sectorData.append(UInt8(logicalSize))
+
+			writeSector(number: sectorNumber, data: sectorData)
+			
+			// Remove sector from free sector set and array
+			freeSectorSet.remove(sectorNumber)
+			sortedFreeSectors.removeFirst()
+			
+			// Increment indexes
+			dataIndex += logicalSize
+			sectorsUsed += 1
+		}
 		
 		// Update the VTOC bitmap
+		writeVTOC(freeSectors: freeSectorSet)
 		
 		// Write the directory entry
+		var entry = DirectoryEntry()
+		entry.fileNumber = fileNumber
+		entry.flags = 0x42
+		entry.length = UInt16(sectorsUsed)
+		entry.start = UInt16(startSectorNumber)
+		entry.filename = DirectoryEntry.filename(atariData: filenameData)
+		writeDirectory(entry: entry, at: fileNumber)
 		
-
-		
-		return false
+		return true
 	}
 	
 	func availableFileNumber() -> Int {
@@ -324,17 +379,14 @@ class AtariDiskImage: NSDocument {
 		return -1
 	}
 	
-	func findFile(named:String, fileExtension:String) -> Int {
-		// Convert string to Atari DOS format, with spaces as filler in 8.3 filename
-		let filename = NSString(format:"%-8@%-3@", named, fileExtension)
-		let search = filename.data(using: String.Encoding.ascii.rawValue, allowLossyConversion: true)
+	func findFile(named name:Data) -> Int {
 		var fileNumber = 0
 		for sectorIndex in 0..<8 {
 			let sectorData = sector(number: directoryStartSectorNumber + sectorIndex)!
 			for entry in 0..<8 {
 				let offset = entry * 16
 				let entryFilename = sectorData.subdata(in: offset + 5 ..< offset + 16)
-				if search == entryFilename {
+				if name == entryFilename {
 					return fileNumber
 				}
 				fileNumber += 1

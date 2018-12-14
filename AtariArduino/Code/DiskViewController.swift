@@ -196,6 +196,9 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 				} catch {
 					NSLog("[LK] Error reading file.")
 				}
+			} // end for
+			if success {
+				reloadDirectory()
 			}
 		}
 		return success
@@ -217,7 +220,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 				var entry = directory[row]
 				entry.setLocked(newLockState)
 				directory[row] = entry
-				disk.updateDirectory(entry: entry, at: entry.fileNumber)
+				disk.writeDirectory(entry: entry, at: entry.fileNumber)
 			}
 			reloadDirectory()
 		}
@@ -240,7 +243,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 				if entry.filename.count > 0 {
 					disk.undoManager?.setActionName(NSLocalizedString("Rename", comment:""))
 					directory[row] = entry
-					disk.updateDirectory(entry: entry, at: entry.fileNumber)
+					disk.writeDirectory(entry: entry, at: entry.fileNumber)
 				}
 				// Reload here because the text field might need to be reset to actual value after editing.
 				reloadDirectory()
