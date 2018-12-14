@@ -17,7 +17,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 	var directory = [DirectoryEntry]()
 	
 	// Constants
-	let acceptableDragTypes:[NSPasteboard.PasteboardType] = [.filePromise]
+	let acceptableDragTypes:[NSPasteboard.PasteboardType] = [.filePromise, .fileURL]
 	
 	// MARK: -
 	
@@ -75,10 +75,6 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			default:
 				statusLabel?.stringValue = String(format:"Unsupported %d KB disk", diskSize)
 			}
-			
-			// TEST
-			let vtocFree = disk.freeSectorsFromVTOC()
-			NSLog("[LK] Bitmap free sectors: \(vtocFree.count)")
 		}
 	}
 	
@@ -98,7 +94,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 				text = "🔒"
 			}
 		case "filename":
-			text = entry.filenameWithExtension()
+			text = entry.filename
 		case "size":
 			text = String(format:"%u", entry.length)
 		default:
@@ -114,13 +110,8 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 	
 	func tableView(_ tableView: NSTableView, writeRowsWith rowIndexes: IndexSet, to pboard: NSPasteboard) -> Bool {
 		var fileExtensions = [String]()
-		for row in rowIndexes {
-			let anExt = directory[row].fileExtension
-			if anExt.count > 0 {
-				fileExtensions.append(anExt)
-			} else {
-				fileExtensions.append("bin")
-			}
+		for _ in rowIndexes {
+			fileExtensions.append("bin")
 		}
 		if fileExtensions.count > 0 {
 			pboard.setPropertyList(fileExtensions, forType: .filePromise)
@@ -132,15 +123,13 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 		var filenames = [String]()
 		if let disk = diskImage() {
 			for row in rowIndexes {
-				let entry = directory[row]
-				let aFilename = entry.filenameWithExtension()
-				
 				// Write files to disk
-				let path = dropDestination.appendingPathComponent(aFilename)
+				let entry = directory[row]
+				let path = dropDestination.appendingPathComponent(entry.filename)
 				if let fileContents = disk.fileContents(startingSectorNumber: Int(entry.start), fileNumber: entry.fileNumber) {
 					do {
 						try fileContents.write(to: path)
-						filenames.append(aFilename)
+						filenames.append(entry.filename)
 					} catch {
 						NSLog("[LK] Error writing file to disk.")
 					}
@@ -151,13 +140,65 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 	}
 	
 	func tableView(_ tableView:NSTableView, validateDrop info:NSDraggingInfo, proposedRow row:Int, proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
-		// TODO: ???
-		return NSDragOperation.generic
+		
+		//NSLog("[LK] Validate drop.")
+		
+		// Hide the highlight of the row or space between rows.
+		tableView.setDropRow(-1, dropOperation: dropOperation)
+		
+		// Only allow drops onto formatted DOS 2.x disks with free sectors
+		var allowOperation = false
+		if let disk = diskImage() {
+			allowOperation = disk.isDos2FormatDisk() && disk.freeSectorCount() > 0
+		}
+		return allowOperation ? NSDragOperation.copy : []
 	}
 	
 	func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
-		// TODO: write code to accept drops
+		
+		let board = info.draggingPasteboard
+		if let dropTypes = board.types {
+			if dropTypes.contains(.fileURL) {
+				if let fileURLs = board.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
+					//NSLog("[LK] Pasteboard returned files \(fileURLs)")
+					return add(files:fileURLs)
+				} else {
+					NSLog("[LK] Pasteboard returned nil data for the fileURL type")
+				}
+			} else if dropTypes.contains(.filePromise) {
+				NSLog("[LK] Dropped a file promise")
+			} else {
+				NSLog("[LK] Unknown items dropped")
+			}
+		}
+		
+		//NSLog("[LK] Accept drop.")
 		return false
+	}
+	
+	func add(files:[URL]) -> Bool {
+		var success = false
+		if let disk = diskImage() {
+			for file in files {
+				do {
+					let fileData = try Data(contentsOf: file, options: [.alwaysMapped])
+					
+					// Check if file will fit
+					let bytesAvailable = disk.bytesAvailable()
+					if fileData.count > bytesAvailable {
+						NSLog("[LK] Not enough sectors available.")
+					} else {
+						// Write file to disk image
+						if disk.addFile(name:file.lastPathComponent, data: fileData) {
+							success = true
+						}
+					}
+				} catch {
+					NSLog("[LK] Error reading file.")
+				}
+			}
+		}
+		return success
 	}
 	
 	// MARK: - IBActions
@@ -194,7 +235,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			let row = directoryTableView!.selectedRow
 			if row != NSNotFound {
 				var entry = directory[row]
-				entry.setFilenameWithExtension(field.stringValue)
+				entry.filename = field.stringValue
 				// Setting the filename will also apply constraints to the filename.ext, so make sure that those constraints didn't result in an empty filename
 				if entry.filename.count > 0 {
 					disk.undoManager?.setActionName(NSLocalizedString("Rename", comment:""))
