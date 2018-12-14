@@ -17,7 +17,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 	var directory = [DirectoryEntry]()
 	
 	// Constants
-	let acceptableDragTypes:[NSPasteboard.PasteboardType] = [.filePromise, .fileURL]
+	let acceptableDragTypes:[NSPasteboard.PasteboardType] = [.filePromise, .fileURL, .fileContents]
 	
 	// MARK: -
 	
@@ -109,14 +109,27 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 	}
 	
 	func tableView(_ tableView: NSTableView, writeRowsWith rowIndexes: IndexSet, to pboard: NSPasteboard) -> Bool {
+		if rowIndexes.count == 0 {
+			return false
+		}
+		guard let disk = diskImage() else {
+			return false
+		}
+		
 		var fileExtensions = [String]()
-		for _ in rowIndexes {
+		var fileContents = [[String:Any]]()
+		for row in rowIndexes {
 			fileExtensions.append("bin")
+			
+			let entry = directory[row]
+			if let contents = disk.fileContents(startingSectorNumber: Int(entry.start), fileNumber: entry.fileNumber) {
+				let name = directory[row].filename
+				fileContents.append(["name": name, "contents": contents])
+			}
 		}
-		if fileExtensions.count > 0 {
-			pboard.setPropertyList(fileExtensions, forType: .filePromise)
-		}
-		return fileExtensions.count > 0
+		pboard.setPropertyList(fileExtensions, forType: .filePromise)
+		pboard.setPropertyList(fileContents, forType: .fileContents)
+		return true
 	}
 	
 	func tableView(_ tableView: NSTableView, namesOfPromisedFilesDroppedAtDestination dropDestination: URL, forDraggedRowsWith rowIndexes: IndexSet) -> [String] {
@@ -156,53 +169,75 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 	
 	func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
 		
+		var success = false
 		let board = info.draggingPasteboard
 		if let dropTypes = board.types {
 			if dropTypes.contains(.fileURL) {
 				if let fileURLs = board.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
-					//NSLog("[LK] Pasteboard returned files \(fileURLs)")
-					return add(files:fileURLs)
+					success = add(fileURLs: fileURLs)
 				} else {
 					NSLog("[LK] Pasteboard returned nil data for the fileURL type")
 				}
-			} else if dropTypes.contains(.filePromise) {
-				NSLog("[LK] Dropped a file promise")
+			} else if dropTypes.contains(.fileContents) {
+				if let fileContents = board.propertyList(forType: .fileContents) as? [[String:Any]] {
+					success = add(fileContents: fileContents)
+				} else {
+					NSLog("[LK] Pasteboard returned nil data for the fileContents type")
+				}
 			} else {
 				NSLog("[LK] Unknown items dropped")
 			}
 		}
 		
-		//NSLog("[LK] Accept drop.")
-		return false
-	}
-	
-	func add(files:[URL]) -> Bool {
-		var success = false
-		if let disk = diskImage() {
-			for file in files {
-				do {
-					let fileData = try Data(contentsOf: file, options: [.alwaysMapped])
-					
-					// Check if file will fit
-					let bytesAvailable = disk.bytesAvailable()
-					if fileData.count > bytesAvailable {
-						NSLog("[LK] Not enough sectors available.")
-					} else {
-						// Write file to disk image
-						if disk.addFile(name:file.lastPathComponent, data: fileData) {
-							success = true
-						}
-					}
-				} catch {
-					NSLog("[LK] Error reading file.")
-				}
-			} // end for
-			if success {
-				reloadDirectory()
-			}
+		if success {
+			reloadDirectory()
 		}
 		return success
 	}
+
+	func add(fileURLs:[URL]) -> Bool {
+		var success = false
+		for file in fileURLs {
+			do {
+				let contents = try Data(contentsOf: file, options: [.alwaysMapped])
+				if addFile(name: file.lastPathComponent, contents: contents) {
+					success = true
+				}
+			} catch {
+				NSLog("[LK] Error reading file.")
+			}
+		} // end for
+		return success
+	}
+
+	func add(fileContents:[[String:Any]]) -> Bool {
+		var success = false
+		for file in fileContents {
+			if let name = file["name"] as? String, let contents = file["contents"] as? Data {
+				if addFile(name: name, contents: contents) {
+					success = true
+				}
+			} else {
+				NSLog("[LK] File wrapper has no content.")
+			}
+		} // end for
+		return success
+	}
+	
+	func addFile(name:String, contents:Data) -> Bool {
+		guard let disk = diskImage() else { return false }
+		
+		// Check if file will fit
+		let bytesAvailable = disk.bytesAvailable()
+		if contents.count > bytesAvailable {
+			NSLog("[LK] Not enough sectors available.")
+			return false
+		}
+		
+		// Write file to disk image
+		return disk.addFile(name: name, contents: contents)
+	}
+	
 	
 	// MARK: - IBActions
 	

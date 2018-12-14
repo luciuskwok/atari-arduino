@@ -274,7 +274,7 @@ class AtariDiskImage: NSDocument {
 		}
 	}
 	
-	func addFile(name:String, data:Data) -> Bool {
+	func addFile(name:String, contents data:Data) -> Bool {
 		if isDos2FormatDisk() == false  {
 			return false;
 		}
