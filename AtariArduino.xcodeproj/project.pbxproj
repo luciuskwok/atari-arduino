@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E0215D3121C4A4DA0084CE68 /* SerialPort.m in Sources */ = {isa = PBXBuildFile; fileRef = E0215D3021C4A4DA0084CE68 /* SerialPort.m */; };
 		E02309AE21BE3EA30021933D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E02309AD21BE3EA30021933D /* Assets.xcassets */; };
 		E02309B121BE3EA30021933D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = E02309AF21BE3EA30021933D /* Main.storyboard */; };
 		E02309B421BE3EA30021933D /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = E02309B321BE3EA30021933D /* main.m */; };
@@ -17,6 +18,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E0215D2F21C4A4DA0084CE68 /* SerialPort.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SerialPort.h; sourceTree = "<group>"; };
+		E0215D3021C4A4DA0084CE68 /* SerialPort.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SerialPort.m; sourceTree = "<group>"; };
 		E02309A121BE3EA20021933D /* AtariArduino.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AtariArduino.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E02309AD21BE3EA30021933D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E02309B021BE3EA30021933D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -78,6 +81,8 @@
 				E0C9A74021C16E45008D9E77 /* DiskViewController.swift */,
 				E0C9A74421C17036008D9E77 /* AtariDiskImage.swift */,
 				E0C9A74621C17F3C008D9E77 /* DirectoryEntry.swift */,
+				E0215D2F21C4A4DA0084CE68 /* SerialPort.h */,
+				E0215D3021C4A4DA0084CE68 /* SerialPort.m */,
 			);
 			path = Code;
 			sourceTree = "<group>";
@@ -154,6 +159,7 @@
 			files = (
 				E0C9A74521C17036008D9E77 /* AtariDiskImage.swift in Sources */,
 				E0C9A74221C16E45008D9E77 /* DiskViewController.swift in Sources */,
+				E0215D3121C4A4DA0084CE68 /* SerialPort.m in Sources */,
 				E02309B421BE3EA30021933D /* main.m in Sources */,
 				E0C9A74321C16E45008D9E77 /* AppDelegate.swift in Sources */,
 				E0C9A74721C17F3C008D9E77 /* DirectoryEntry.swift in Sources */,
