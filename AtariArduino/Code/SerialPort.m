@@ -19,7 +19,6 @@
 		_isOpen = NO;
 		_fileDescriptor = 0;
 		_bitrate = 19200;
-		
 	}
 	return self;
 }
@@ -39,8 +38,8 @@
 	}
 	
 	int fd = open(cPath, O_RDWR | O_NOCTTY | O_EXLOCK | O_NONBLOCK);
-	if (fd <= 0) {
-		NSLog(@"[LK] Error opening serial device.");
+	if (fd == -1) {
+		NSLog(@"[LK] Error opening serial device: %s (%d)", strerror(errno), errno);
 		return NO;
 	}
 	_fileDescriptor = fd;
@@ -48,8 +47,8 @@
 	
 	// Clear the O_NONBLOCK so that I/O will block and wait for more data.
 	err = fcntl(_fileDescriptor, F_SETFL, 0);
-	if (err < 0) {
-		NSLog(@"[LK] Error clearing O_NONBLOCK: %d", err);
+	if (err == -1) {
+		NSLog(@"[LK] Error clearing O_NONBLOCK: %s (%d)", strerror(errno), errno);
 	}
 	
 	// Set port options.
@@ -63,14 +62,14 @@
 	cfsetspeed(&options, _bitrate);
 	
 	err = tcsetattr(_fileDescriptor, TCSANOW, &options);
-	if (err != 0) {
-		NSLog(@"[LK] Error setting termios options: %d", err);
+	if (err == -1) {
+		NSLog(@"[LK] Error setting termios options: %s (%d)", strerror(errno), errno);
 	}
 	
-	// Start a dispatch_source for reading bytes from the port
-	dispatch_source_t readingSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, self.fileDescriptor, 0, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
+	// Add handler for receiving bytes from the port
+	dispatch_source_t rxSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, self.fileDescriptor, 0, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
 	SerialPort __weak *weakSelf = self;
-	dispatch_source_set_event_handler (readingSource, ^{
+	dispatch_source_set_event_handler (rxSource, ^{
 		if (weakSelf != nil && weakSelf.isOpen) {
 			NSMutableData *buffer = [NSMutableData dataWithLength:1024];
 			long bytesRead = read(fd, buffer.mutableBytes, buffer.length);
@@ -84,6 +83,12 @@
 			}
 		}
 	});
+	// Close port if recieving is reset
+	dispatch_source_set_cancel_handler(rxSource, ^{
+		[weakSelf close];
+	});
+	dispatch_resume(rxSource);
+	self.receiveSource = rxSource;
 	
 	return YES;
 }
@@ -112,7 +117,5 @@
 	_isOpen = NO;
 	_fileDescriptor = 0;
 }
-
-
 
 @end

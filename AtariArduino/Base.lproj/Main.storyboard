@@ -204,6 +204,25 @@ CA
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem title="Port" id="063-4v-IXA">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Port" id="SmF-50-8Xq">
+                                    <items>
+                                        <menuItem title="Open Serial Port" id="iih-AS-kzI">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="toggleSerialPort:" target="Voe-Tx-rLC" id="g6Z-j0-9g8"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Send Test" id="EN0-Rj-QvZ">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sendTestData:" target="Voe-Tx-rLC" id="8ZC-2P-0mB"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem title="Window" id="aUF-d1-5bR">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <menu key="submenu" title="Window" systemMenu="window" id="Td7-aD-5lo">
@@ -431,17 +450,43 @@ CA
                                 <rect key="frame" x="0.0" y="0.0" width="300" height="30"/>
                                 <subviews>
                                     <textField horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="Rwe-oS-uQM">
-                                        <rect key="frame" x="105" y="8" width="90" height="14"/>
+                                        <rect key="frame" x="202" y="8" width="90" height="14"/>
                                         <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingMiddle" title="707 sectors free" usesSingleLineMode="YES" id="5Xi-G1-ZTZ">
                                             <font key="font" metaFont="smallSystem"/>
                                             <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
                                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                                         </textFieldCell>
                                     </textField>
+                                    <popUpButton verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="vWa-Bd-DSo">
+                                        <rect key="frame" x="7" y="3" width="96" height="22"/>
+                                        <popUpButtonCell key="cell" type="push" title="Unmounted" bezelStyle="rounded" alignment="left" controlSize="small" lineBreakMode="truncatingTail" state="on" borderStyle="borderAndBezel" imageScaling="proportionallyDown" inset="2" selectedItem="4KP-o3-uXe" id="sHS-eF-kck">
+                                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                                            <font key="font" metaFont="smallSystem"/>
+                                            <menu key="menu" id="aph-Yt-JWR">
+                                                <items>
+                                                    <menuItem title="Unmounted" state="on" id="4KP-o3-uXe"/>
+                                                    <menuItem isSeparatorItem="YES" id="zJe-xS-aVo"/>
+                                                    <menuItem title="D1:" id="alR-uL-fdv"/>
+                                                    <menuItem title="D2:" id="Svc-P9-6AO"/>
+                                                    <menuItem title="D3:" id="8mQ-lT-xXZ"/>
+                                                    <menuItem title="D4:" id="NZY-Kl-Hao"/>
+                                                    <menuItem title="D5:" id="NgM-le-nrI"/>
+                                                    <menuItem title="D6:" id="c2J-Xz-Emn"/>
+                                                    <menuItem title="D7:" id="i3t-6b-EMg"/>
+                                                    <menuItem title="D8:" id="Emj-w7-FCQ"/>
+                                                </items>
+                                            </menu>
+                                        </popUpButtonCell>
+                                        <connections>
+                                            <action selector="mountDidChange:" target="5gI-5U-AMq" id="y7I-73-Q9q"/>
+                                        </connections>
+                                    </popUpButton>
                                 </subviews>
                                 <constraints>
-                                    <constraint firstItem="Rwe-oS-uQM" firstAttribute="leading" relation="greaterThanOrEqual" secondItem="WWr-gF-UO2" secondAttribute="leading" constant="2" id="pRV-m3-LKg"/>
-                                    <constraint firstItem="Rwe-oS-uQM" firstAttribute="centerX" secondItem="WWr-gF-UO2" secondAttribute="centerX" id="yDP-xr-Y6c"/>
+                                    <constraint firstItem="vWa-Bd-DSo" firstAttribute="centerY" secondItem="WWr-gF-UO2" secondAttribute="centerY" id="DRR-zo-dFV"/>
+                                    <constraint firstItem="vWa-Bd-DSo" firstAttribute="leading" secondItem="WWr-gF-UO2" secondAttribute="leading" constant="10" id="Yav-pv-tiy"/>
+                                    <constraint firstItem="Rwe-oS-uQM" firstAttribute="leading" relation="greaterThanOrEqual" secondItem="vWa-Bd-DSo" secondAttribute="trailing" constant="2" id="fOk-J6-QgM"/>
+                                    <constraint firstAttribute="trailing" secondItem="Rwe-oS-uQM" secondAttribute="trailing" constant="10" id="uYe-j3-gcG"/>
                                     <constraint firstItem="Rwe-oS-uQM" firstAttribute="centerY" secondItem="WWr-gF-UO2" secondAttribute="centerY" id="ywk-hY-oWf"/>
                                 </constraints>
                             </customView>
@@ -459,6 +504,7 @@ CA
                     </view>
                     <connections>
                         <outlet property="directoryTableView" destination="P8s-LH-geg" id="wKX-6J-26c"/>
+                        <outlet property="mountPopUp" destination="vWa-Bd-DSo" id="bwt-3C-h2W"/>
                         <outlet property="statusLabel" destination="Rwe-oS-uQM" id="PWv-wM-bsk"/>
                     </connections>
                 </viewController>

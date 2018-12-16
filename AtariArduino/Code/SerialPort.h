@@ -16,6 +16,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (assign, nonatomic) BOOL isOpen;
 @property (assign, nonatomic) int fileDescriptor;
 @property (assign, nonatomic) UInt32 bitrate;
+@property (strong, nonatomic) dispatch_source_t receiveSource;
 @property (copy, nonatomic, nullable) void (^didReceiveData)(NSData*);
 
 - (BOOL) open:(NSString *)devicePath;

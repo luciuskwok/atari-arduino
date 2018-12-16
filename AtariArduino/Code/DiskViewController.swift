@@ -12,12 +12,12 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 	// IBOutlets
 	@IBOutlet weak var directoryTableView:NSTableView?
 	@IBOutlet weak var statusLabel:NSTextField?
+	@IBOutlet weak var mountPopUp:NSPopUpButton?
 	
 	// Variables
 	var directory = [DirectoryEntry]()
 	
 	// Constants
-	let acceptableDragTypes:[NSPasteboard.PasteboardType] = [.filePromise, .fileURL, .fileContents]
 	
 	// MARK: -
 	
@@ -28,7 +28,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			tv.delegate = self
 			tv.dataSource = self
 			tv.doubleAction = #selector(renameItem(_:))
-			tv.registerForDraggedTypes(acceptableDragTypes)
+			tv.registerForDraggedTypes([.filePromise, .fileURL, .fileContents])
 			tv.setDraggingSourceOperationMask(.copy, forLocal: false) // Allow copying out of app.
 			tv.draggingDestinationFeedbackStyle = .none
 		}
@@ -40,11 +40,24 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 		nc.addObserver(forName: .NSUndoManagerDidRedoChange, object: nil, queue: nil) { _ in
 			self.reloadDirectory()
 		}
+		nc.addObserver(forName: ArduinoDevice.mountDidChangeNotification, object: nil, queue: nil) { _ in
+			self.reloadMountPopUp()
+		}
 	}
 	
 	override func viewWillAppear() {
 		super.viewWillAppear()
 		reloadDirectory()
+		reloadMountPopUp()
+		NSLog("[LK] View will appear.")
+	}
+	
+	override func viewDidDisappear() {
+		if let disk = diskImage() {
+			let arduino = ArduinoDevice.shared
+			arduino.unmount(disk: disk)
+		}
+		NSLog("[LK] View did disappear.")
 	}
 	
 	// MARK: - Document
@@ -76,6 +89,22 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 				statusLabel?.stringValue = String(format:"Unsupported %d KB disk", diskSize)
 			}
 		}
+	}
+	
+	func reloadMountPopUp() {
+		guard let popup = mountPopUp, let disk = diskImage() else {
+			return
+		}
+		let arduino = ArduinoDevice.shared
+		if let mountIndex = arduino.mountedDisks.lastIndex(of: disk) {
+			// Select a "D#:" mount point
+			popup.selectItem(at: mountIndex + 2)
+		} else {
+			// Select "Unmounted"
+			popup.selectItem(at: 0)
+		}
+		popup.synchronizeTitleAndSelectedItem()
+		//NSLog("[LK] Reloaded mount popup.")
 	}
 	
 	// MARK: - Table
@@ -305,6 +334,19 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			reloadDirectory()
 		}
 	}
+	
+	@IBAction func mountDidChange(_ sender:Any?) {
+		guard let popup = sender as? NSPopUpButton, let disk = diskImage() else {
+			return
+		}
+		let arduino = ArduinoDevice.shared
+		let index = Int(popup.indexOfSelectedItem)
+		if index < 2 {
+			arduino.unmount(disk: disk)
+		} else {
+			arduino.mount(disk: disk, at:index - 2)
+		}
+	}
 
 	func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
 		var enableItem = false
@@ -339,6 +381,9 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 					}
 				}
 			}
+			
+		case #selector(mountDidChange(_:)): // Mount pop-up
+			enableItem = true
 			
 		default:
 			break
