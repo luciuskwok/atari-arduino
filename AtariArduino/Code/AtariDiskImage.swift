@@ -114,7 +114,7 @@ class AtariDiskImage: NSDocument {
 		
 		// Keep the sector data
 		sectors = sectorArray
-		NSLog("Read \(sectors.count) sectors")
+		//NSLog("Read \(sectors.count) sectors")
 	}
 	
 	func error(code:Int) -> NSError {

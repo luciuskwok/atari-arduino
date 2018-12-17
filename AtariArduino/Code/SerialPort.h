@@ -19,6 +19,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (strong, nonatomic) dispatch_source_t receiveSource;
 @property (copy, nonatomic, nullable) void (^didReceiveData)(NSData*);
 
++ (nullable NSString *)deviceWithPrefix :(NSString *)prefix;
+
 - (BOOL) open:(NSString *)devicePath;
 - (BOOL) sendData:(NSData *)data;
 - (void) close;

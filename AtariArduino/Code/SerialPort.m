@@ -8,6 +8,8 @@
 
 #import "SerialPort.h"
 #import <termios.h>
+#import <dirent.h>
+#import <sys/types.h>
 #import <sys/param.h>
 #import <sys/filio.h>
 #import <sys/ioctl.h>
@@ -21,6 +23,28 @@
 		_bitrate = 19200;
 	}
 	return self;
+}
+
++ (nullable NSString *)deviceWithPrefix:(NSString *)prefix {
+	// Prefix should be "cu.usbmodem", the "/dev/" will be added here.
+	NSString *result = nil;
+	DIR *dp;
+	struct dirent *ep;
+	dp = opendir("/dev/");
+	if (dp != nil) {
+		while ((ep = readdir(dp)) != nil) {
+			NSString *filename = [NSString stringWithCString:ep->d_name encoding:NSASCIIStringEncoding];
+			if (filename) {
+				if ([filename hasPrefix:prefix]) {
+					result = [NSString stringWithFormat:@"/dev/%@", filename];
+				}
+			}
+		}
+		closedir(dp);
+	} else {
+		NSLog(@"[LK] Could not open directory /dev/");
+	}
+	return result;
 }
 
 - (BOOL) open:(NSString *)devicePath {

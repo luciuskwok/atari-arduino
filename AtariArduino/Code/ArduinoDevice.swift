@@ -12,7 +12,7 @@ import IOKit.serial
 
 class ArduinoDevice {
 	// Update the device name as needed.
-	let deviceName = "/dev/cu.usbmodem1461"
+	let devicePrefix = "cu.usbmodem" // Example:  "/dev/cu.usbmodem1461"
 	
 	static var shared = ArduinoDevice()
 	var serialPort:SerialPort?
@@ -67,8 +67,12 @@ class ArduinoDevice {
 			if port.isOpen {
 				port.close()
 			} else {
-				port.open(deviceName)
-				inputRemaining = 0
+				if let deviceName = SerialPort.device(withPrefix: devicePrefix) {
+					port.open(deviceName)
+					inputRemaining = 0
+				} else {
+					NSLog("[LK] Arduino serial device not found.")
+				}
 			}
 		}
 	}
