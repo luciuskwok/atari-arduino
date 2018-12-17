@@ -11,14 +11,12 @@ import Cocoa
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 	
 	func applicationDidFinishLaunching(_ notification: Notification) {
-		// Insert code here to initialize your application
-		NSLog("[LK] Application did finish launching.")
+		//NSLog("[LK] Application did finish launching.")
 		ArduinoDevice.shared.open()
 	}
 	
 	func applicationWillTerminate(_ notification: Notification) {
-		// Insert code here to tear down your application
-		NSLog("[LK] Application will terminate.")
+		//NSLog("[LK] Application will terminate.")
 		ArduinoDevice.shared.close()
 	}
 	

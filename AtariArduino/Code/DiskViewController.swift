@@ -49,7 +49,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 		super.viewWillAppear()
 		reloadDirectory()
 		reloadMountPopUp()
-		NSLog("[LK] View will appear.")
+		//NSLog("[LK] View will appear.")
 	}
 	
 	override func viewDidDisappear() {
@@ -57,7 +57,7 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 			let arduino = ArduinoDevice.shared
 			arduino.unmount(disk: disk)
 		}
-		NSLog("[LK] View did disappear.")
+		//NSLog("[LK] View did disappear.")
 	}
 	
 	// MARK: - Document

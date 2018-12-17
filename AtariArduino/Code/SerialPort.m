@@ -97,15 +97,15 @@
 	if (_isOpen == NO) {
 		return NO;
 	}
-	NSUInteger index = 0;
-	while (index < data.length) {
-		long writeCount = write(_fileDescriptor, data.bytes + index, data.length - index);
-		if (writeCount < 0) {
-			NSLog(@"[LK] Error writing to serial port: %ld", writeCount);
-			return NO;
-		}
-		index += writeCount;
+	
+	long writeCount = write(_fileDescriptor, data.bytes, data.length);
+	
+	//NSLog(@"[LK] Transmitted %ld byte(s).", writeCount);
+	if (writeCount <= 0) {
+		NSLog(@"[LK] Error writing to serial device: %s (%d)", strerror(errno), errno);
+		return NO;
 	}
+
 	return YES;
 }
 

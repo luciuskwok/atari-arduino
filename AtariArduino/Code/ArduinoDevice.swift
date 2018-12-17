@@ -11,13 +11,17 @@ import IOKit
 import IOKit.serial
 
 class ArduinoDevice {
+	// Update the device name as needed.
+	let deviceName = "/dev/cu.usbmodem1461"
+	
 	static var shared = ArduinoDevice()
 	var serialPort:SerialPort?
 	var mountedDisks = [AtariDiskImage?]()
 
 	var inputBuffer = Data()
 	var inputRemaining = 0
-	var inputBufferClosure: ((_ buffer:Data) -> Void)?
+	var previousReceivedTimestamp = Date()
+	let inputTimeout = 1.0 // seconds
 	
 	// Notification
 	static let mountDidChangeNotification = NSNotification.Name("ArduinoDevice.MountDidChange")
@@ -33,6 +37,7 @@ class ArduinoDevice {
 		case read = 0x52 // R: read a sector
 		case driveStatus = 0x53 // S: 4 data bytes
 		case write = 0x57 // W: same as "put" but with verification
+		case debugInfo = 1
 		case none = 0
 	}
 	enum ReplyCode: UInt8 {
@@ -62,7 +67,8 @@ class ArduinoDevice {
 			if port.isOpen {
 				port.close()
 			} else {
-				port.open("/dev/cu.usbmodem1461")
+				port.open(deviceName)
+				inputRemaining = 0
 			}
 		}
 	}
@@ -82,172 +88,167 @@ class ArduinoDevice {
 	
 	func send(data:Data) {
 		if let port = serialPort, port.isOpen {
-			port.send(data)
+			let count = UInt8(data.count)
+			let checksum = crc8(data)
+
+			var outputData = data
+			outputData.insert(count, at: 0)
+			outputData.append(checksum)
+			port.send(outputData)
 		}
 	}
 	
-	func send(reply: ReplyCode) {
-		send(byte: reply.rawValue)
-	}
-	
-	func send(byte: UInt8) {
+	func send(reply:ReplyCode) {
 		if let port = serialPort, port.isOpen {
-			port.send(Data(bytes: [byte]))
+			port.send(Data([reply.rawValue]))
 		}
 	}
 	
 	func receive(data:Data) {
-		// When inputRemaining is zero, we're waiting for a command. Otherwise, store received data in buffer.
-		if inputRemaining > 0 {
-			let count = min(data.count, inputRemaining)
-			inputBuffer.append(data.subdata(in: 0..<count))
-			inputRemaining -= count
-			if inputRemaining == 0, let closure = inputBufferClosure {
-				closure(inputBuffer)
-			}
-		} else {
-			// Parse Command frame
-			if data.count == 5 {
-				// Validate checksum
-				let checksum = crc8(data.subdata(in: 0..<4))
-				if checksum != data[4] {
-					NSLog("[LK] Invalid checksum.")
-					return
-				}
-				
-				// Validate device ID
-				let deviceID = data[0]
-				if deviceID < 0x31 || deviceID > 0x38 {
-					NSLog("[LK] Invalid device ID.")
-					return
-				}
-				let drive = Int(deviceID - 0x31)
-				let sector = Int(data[2]) + Int(data[3]) * 256
-				
-				// Delay until 1 ms has passed
-				DispatchQueue.main.asyncAfter(deadline: .now() + 0.001) {
-					if let command = CommandCode(rawValue: data[1]) {
-						switch command {
-						case .read: // 'R'
-							print("Read sector \(sector)")
-							self.sendSector(drive: drive, sector: sector)
-						case .driveStatus: // 'S'
-							print("Status sector \(sector)")
-							self.sendDriveStatus(drive: drive, sector: sector)
-						case .write: // 'W'
-							print("Write sector \(sector)")
-							self.receiveSector(drive: drive, sector: sector)
-						case .put: // 'P'
-							print("Put sector \(sector)")
-							self.receiveSector(drive: drive, sector: sector)
-						default:
-							print("Other command")
-							self.send(reply: .error)
-						}
-					} else {
-						print("Unknown command \(data[1]), sector \(sector)")
-						self.send(reply: .error)
-					}
-				} // end DispatchQueue.main.async()
-			}
-		}
-	}
-	
-	func sendSector(drive:Int, sector:Int) {
-		if let disk = mountedDisks[drive], let sectorData = disk.sector(number: sector) {
-			send(reply: .complete)
-			send(data: sectorData)
-			send(byte: crc8(sectorData)) // checksum
-			NSLog("Sent sector")
-		} else {
-			NSLog("[LK] Invalid drive or sector number")
-			send(reply: .error)
-		}
-	}
-	
-	func sendDriveStatus(drive:Int, sector:Int) {
-		guard let disk = mountedDisks[drive] else {
-			send(reply: .error)
-			return;
+		// When receiving data, initially look for a single byte that indicates the length of the data in the frame to be received. If there has been a gap of inputTimeout since that last received data, clear the inputBuffer and look for a new frame.
+		if previousReceivedTimestamp.timeIntervalSinceNow < -inputTimeout {
+			NSLog("[LK] Serial timed out.")
+			inputRemaining = 0
 		}
 		
+		// Update timestamp
+		previousReceivedTimestamp = Date()
+		
+		for c in data {
+			receiveByte(c)
+		}
+	}
+	
+	func receiveByte(_ c:UInt8) {
+		if inputRemaining <= 0 {
+			inputBuffer = Data() // Clear buffer
+			inputRemaining = Int(c) + 1 // Add 1 for checksum
+		} else {
+			inputBuffer.append(c)
+			inputRemaining -= 1
+		}
+		
+		// Verify and process the completed frame that was received.
+		if inputRemaining <= 0 {
+			let frameData = inputBuffer.subdata(in: 0 ..< inputBuffer.count - 1)
+			let checksum = crc8(frameData)
+			if checksum == inputBuffer.last! {
+				process(frameData: frameData)
+			} else {
+				NSLog("[LK] Invalid checksum")
+				printHexdump(data: inputBuffer)
+			}
+			inputRemaining = 0
+		}
+	}
+	
+	func printHexdump(data:Data) {
+		var s = String()
+		for c in data {
+			s += String(format:"%02X ", c)
+		}
+		print(s)
+	}
+	
+	func process(frameData:Data) {
+		let drive = frameData[1] - 0x31;
+		if let command = CommandCode(rawValue: frameData[0]) {
+			switch command {
+			case .driveStatus:
+				sendDriveStatus(drive: drive)
+			case .read:
+				let sector = Int(frameData[2]) + 256 * Int(frameData[3])
+				sendSector(drive: drive, sector: sector, offset: frameData[4])
+			case .debugInfo:
+				if let string = String(data: frameData.subdata(in: 1 ..< frameData.count), encoding: .ascii) {
+					NSLog("[ARD] " + string)
+				}
+			default:
+				NSLog("[LK] Unsupported command.")
+			}
+		} else {
+			NSLog("[LK] Unknown command.")
+		}
+	}
+	
+	func sendDriveStatus(drive:UInt8) {
 		var status = Data(count: 4)
+		if drive < 8, let disk = mountedDisks[Int(drive)] {
+			// Enhanced density (Atari 1050) | Active/Standby
+			status[0] = 0x18
 		
-		// Write protect (locked disk image)
-		if disk.isLocked {
-			status[0] |= 0x08
+			// Write protect (locked disk image)
+			if disk.isLocked {
+				status[0] |= 0x08
+			}
+
+			// status[1]: floppy disk controller chip status register value
+			status[2] = 5 // timeout in seconds
+			// status[3]: unused
 		}
-		// Enhanced density (Atari 1050)
-		if disk.sectors.count >= 1040 {
-			status[0] |= 0x80
-		}
-		// Active/standby
-		status[0] |= 0x10
 		
-		// status[1]: floppy disk controller chip status register value
-		
-		// status[2]: timeout in seconds
-		status[2] = 5
-		
-		// Send 'C', 4-byte data frame, followed by checksum
-		send(reply: .complete)
 		send(data: status)
-		send(byte: crc8(status)) // checksum
+		NSLog("[LK] Sent drive \(drive) status.")
 	}
+
+	
+	func sendSector(drive:UInt8, sector:Int, offset:UInt8) {
+		// Send error if disk is not mounted in requested drive, the sector data does not exist, or the sector is not 128 bytes long.
+		guard drive < 8, let disk = self.mountedDisks[Int(drive)], let sectorData = disk.sector(number: sector) else {
+			send(reply:.error)
+			return
+		}
+		
+		// If offset is 0xFF, treat this as a query as to whether the sector is valid.
+		if offset == 0xFF {
+			send(reply:.acknowledge)
+			return
+		}
+		
+		// Send the sector chunk as 32 bytes, to keep under the Arduino's 64-byte serial buffer limit
+		let chunkData = sectorData.subdata(in: Int(offset) ..< Int(offset) + 32)
+		send(data: chunkData)
+		//NSLog("Sent drive \(drive) sector \(sector) offset \(offset).")
+	}
+	
 	
 	func receiveSector(drive:Int, sector:Int) {
+		// Receive the sector in one 128-byte chunk because Arduino should have no problem sending more than 64 bytes at a time.
+		// First, send a reply if it's OK to write a sector to disk.
 		if let disk = mountedDisks[drive], sector <= disk.sectors.count && disk.isLocked == false {
-			// Set up to receive sector data, which might be broken up into several chunks
-			inputBuffer = Data()
-			inputRemaining = 129 // 128 bytes + checksum byte
-			inputBufferClosure = { buffer in
-				self.write(data: buffer, drive:drive, sector:sector)
-			}
+			send(reply:.acknowledge)
 		} else {
-			NSLog("[LK] Invalid drive or sector number")
-			send(reply: .error)
+			send(reply:.error)
+			return
 		}
+		
+		// Set up to receive sector data, which might be broken up into several chunks
+		// TODO: rewrite input buffer handling
 	}
 	
 	func write(data: Data, drive:Int, sector:Int) {
-		if verifyFrame(data) == false {
-			NSLog("[LK] Invalid checksum")
-			send(reply: .error)
+		guard data.count == 128 else {
+			NSLog("[LK] Sector data is not 128 bytes long.")
 			return
 		}
-		let sectorData = data.subdata(in: 0..<data.count - 1)
-		if sectorData.count != 128 {
-			NSLog("[LK] Sector data is not 128 bytes long")
-			send(reply: .error)
+		guard let disk = self.mountedDisks[drive] else {
+			NSLog("[LK] Invalid drive \(drive).")
+			return
+		}
+		if disk.isLocked {
+			NSLog("[LK] Disk \(drive) is locked.")
+			return
+		}
+		if sector > disk.sectors.count {
+			NSLog("[LK] Sector \(sector) is beyond end of disk.")
 			return
 		}
 		
-		// Delay at least 850 microseconds before sending acknowledge.
-		DispatchQueue.main.asyncAfter(deadline: .now() + 0.00085) {
-			if let disk = self.mountedDisks[drive], sector <= disk.sectors.count && disk.isLocked == false {
-				self.send(reply: .acknowledge)
-				disk.writeSector(number: sector, data: sectorData)
-				NotificationCenter.default.post(name: ArduinoDevice.diskDidChangeNotification, object: self)
-				// Delay at least 250 microseconds before sending complete.
-				DispatchQueue.main.asyncAfter(deadline: .now() + 0.00025) {
-					self.send(reply: .complete)
-				}
-			} else {
-				NSLog("[LK] Invalid drive or sector number")
-				self.send(reply: .error)
-			}
-		}
+		disk.writeSector(number: sector, data: data)
+		NotificationCenter.default.post(name: ArduinoDevice.diskDidChangeNotification, object: self)
+		NSLog("[LK] Wrote disk \(drive), sector \(sector).")
 	}
 
-	func verifyFrame(_ data:Data) -> Bool {
-		if data.count < 2 {
-			NSLog("[LK] Data frame too short")
-			return false
-		}
-		let checksum = crc8(data.subdata(in: 0..<data.count - 1))
-		return checksum == data.last!
-	}
-	
 	func crc8(_ data:Data) -> UInt8 {
 		var result = UInt16(0)
 		for c in data {
