@@ -40,6 +40,9 @@ class DiskViewController: NSViewController, NSTableViewDelegate, NSTableViewData
 		nc.addObserver(forName: .NSUndoManagerDidRedoChange, object: nil, queue: nil) { _ in
 			self.reloadDirectory()
 		}
+		nc.addObserver(forName: ArduinoDevice.diskDidChangeNotification, object: nil, queue: nil) { _ in
+			self.reloadDirectory()
+		}
 		nc.addObserver(forName: ArduinoDevice.mountDidChangeNotification, object: nil, queue: nil) { _ in
 			self.reloadMountPopUp()
 		}

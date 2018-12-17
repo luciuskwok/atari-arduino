@@ -159,6 +159,8 @@ class ArduinoDevice {
 			case .read:
 				let sector = Int(frameData[2]) + 256 * Int(frameData[3])
 				sendSector(drive: drive, sector: sector, offset: frameData[4])
+			case .write:
+				receiveSector(data: frameData)
 			case .debugInfo:
 				if let string = String(data: frameData.subdata(in: 1 ..< frameData.count), encoding: .ascii) {
 					NSLog("[ARD] " + string)
@@ -212,41 +214,51 @@ class ArduinoDevice {
 	}
 	
 	
-	func receiveSector(drive:Int, sector:Int) {
-		// Receive the sector in one 128-byte chunk because Arduino should have no problem sending more than 64 bytes at a time.
-		// First, send a reply if it's OK to write a sector to disk.
-		if let disk = mountedDisks[drive], sector <= disk.sectors.count && disk.isLocked == false {
-			send(reply:.acknowledge)
-		} else {
+	func receiveSector(data:Data) {
+		guard data.count == 132 else {
+			NSLog("[LK] Received sector data frame is not 132 bytes long.")
 			send(reply:.error)
 			return
 		}
 		
-		// Set up to receive sector data, which might be broken up into several chunks
-		// TODO: rewrite input buffer handling
-	}
-	
-	func write(data: Data, drive:Int, sector:Int) {
-		guard data.count == 128 else {
-			NSLog("[LK] Sector data is not 128 bytes long.")
+		// Receive the sector in one 128-byte chunk because Arduino should have no problem sending more than 64 bytes at a time.
+		let drive = Int(data[1]) - 0x31;
+		let sector = Int(data[2]) + 256 * Int(data[3])
+		
+		// Write sector data
+		let sectorData = data.subdata(in: 4 ..< data.count)
+		if write(data:sectorData, drive:drive, sector:sector) == false {
+			NSLog("[LK] Invalid parameters.")
+			send(reply:.error)
 			return
 		}
-		guard let disk = self.mountedDisks[drive] else {
+		
+		// Reply with Complete
+		send(reply:.complete)
+	}
+	
+	func write(data: Data, drive:Int, sector:Int) -> Bool {
+		guard data.count == 128 else {
+			NSLog("[LK] Sector data is not 128 bytes long.")
+			return false
+		}
+		guard drive < 8, let disk = self.mountedDisks[drive] else {
 			NSLog("[LK] Invalid drive \(drive).")
-			return
+			return false
 		}
 		if disk.isLocked {
 			NSLog("[LK] Disk \(drive) is locked.")
-			return
+			return false
 		}
 		if sector > disk.sectors.count {
 			NSLog("[LK] Sector \(sector) is beyond end of disk.")
-			return
+			return false
 		}
 		
 		disk.writeSector(number: sector, data: data)
 		NotificationCenter.default.post(name: ArduinoDevice.diskDidChangeNotification, object: self)
 		NSLog("[LK] Wrote disk \(drive), sector \(sector).")
+		return true
 	}
 
 	func crc8(_ data:Data) -> UInt8 {

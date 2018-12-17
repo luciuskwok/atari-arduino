@@ -62,6 +62,12 @@ void parseCommand(byte buffer[5]) {
       sendSectorToAtari(device, sector);
       break;
 
+    case 'P':
+    case 'W':
+      Serial1.write('A');
+      receiveSectorFromAtari(device, sector);
+      break;
+
     default:
       // Unhandled command: send negative acknowledge
       Serial1.write('N');
@@ -108,7 +114,7 @@ void sendSectorToAtari(byte device, unsigned int sector) {
   delay(1);
 
   // Wait for reply
-  if (receiveReply() != 0x41) {
+  if (receiveReply() != 'A') {
     // Error
     Serial1.write('E');
     sendDebugInfoToMac("Error getting sector status.");
@@ -144,6 +150,50 @@ void sendSectorToAtari(byte device, unsigned int sector) {
   Serial1.write(sectorData, 128);
   Serial1.write(crc(sectorData, 128));
 }
+
+void receiveSectorFromAtari(byte device, unsigned int sector) {
+  byte buffer[133];
+  byte *sectorData = buffer + 4;
+  int readCount = Serial1.readBytes(sectorData, 129);
+
+  // Verify length
+  if (readCount != 129) {
+    sendDebugInfoToMac("Did not receive whole sector before timeout.");
+    Serial1.write('E');
+    return;
+  }
+
+  // Verify checksum
+  if (sectorData[128] != crc(sectorData, 128)) {
+    sendDebugInfoToMac("Invalid checksum.");
+    Serial1.write('E');
+    return;
+  }
+
+  // Send Acknowledge after delay
+  delay(1);
+  Serial1.write('A');
+
+  // Set up sector as data frame for sending to Mac
+  buffer[0] = 'W';
+  buffer[1] = device;
+  buffer[2] = sector % 256;
+  buffer[3] = sector / 256;
+
+  // Send buffer without checksum added by Atari
+  sendToMac(buffer, 132);
+
+  // Wait for reply
+  if (receiveReply() == 'C') {
+    Serial1.write('C');
+  } else {
+    // Error
+    Serial1.write('E');
+    sendDebugInfoToMac("Error getting sector status.");
+  }
+}
+
+// == Utility ==
 
 byte crc(byte buffer[], int count) {
   unsigned int result = 0;
